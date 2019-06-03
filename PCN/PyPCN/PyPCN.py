@@ -80,7 +80,7 @@ def DrawFace(win,img):
     pts = (pts @ R.T).astype(int) #Rotate points
     pts = pts.reshape((-1,1,2))
     cv2.polylines(img,[pts],True,(0,0,255))
-    cv2.putText(img,"Face",(x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2,cv2.LINE_AA)
+    #cv2.putText(img,"Face",(x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 1,(255,255,255),2,cv2.LINE_AA)
 
 def DrawPoints(win,img):
     f = FeatEnam.NOSE

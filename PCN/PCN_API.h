@@ -2,11 +2,11 @@
 #define __PCN_API__
 #include "PCN.h"
 
+#define kFeaturePoints 14
 struct CPoint{
 	int x;
 	int y;
 };
-#define kFeaturePoints 14
 struct CWindow{
 	int x, y, width, angle;
 	float score;
@@ -54,6 +54,7 @@ extern "C"
 		return static_cast<void*> (detector);
 	}
 
+	//TODO: return static array
 	CWindow* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
 	{
 		PCN* detector = (PCN*) pcn;
