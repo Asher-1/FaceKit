@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import sys
 import os
-from ipdb import set_trace as dbg
+#from ipdb import set_trace as dbg
 from enum import IntEnum
 
 class CPoint(Structure):
