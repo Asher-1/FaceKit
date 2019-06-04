@@ -10,6 +10,7 @@ struct CPoint{
 struct CWindow{
 	int x, y, width, angle;
 	float score;
+	int id;
 	struct CPoint points[kFeaturePoints];
 
 	void from_window(Window win)
@@ -19,6 +20,7 @@ struct CWindow{
 		width = win.width;
 		angle = win.angle;
 		score = win.score;
+		id = win.id;
 		//TODO memcpy..
 		for (int f=0; f< win.points14.size(); f++){
 			points[f].x = win.points14[f].x;

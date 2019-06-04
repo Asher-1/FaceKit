@@ -4,7 +4,7 @@ from distutils.core import setup
 from distutils.extension import Extension
 from distutils.core import setup, Extension
 
-setup ( name = 'Python PCN wrapper',
+setup ( name = 'PyPCN',
         packages=['PyPCN'],
-        description = 'This package wraps PCN detector')
+        description = 'Python PCN wrapper')
 
