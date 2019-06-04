@@ -23,6 +23,7 @@ public:
     bool Inside(int x, int y, Window2 rect);
     int SmoothAngle(int a, int b);
     std::vector<Window2> SmoothWindow(std::vector<Window2> winList);
+    std::vector<Window2> SmoothWindowWithId(std::vector<Window2> winList);
     float IoU(Window2 &w1, Window2 &w2);
     std::vector<Window2> NMS(std::vector<Window2> &winList, bool local, float threshold);
     std::vector<Window2> DeleteFP(std::vector<Window2> &winList);
@@ -123,7 +124,7 @@ std::vector<Window> PCN::Detect(cv::Mat img)
 
     if (p->stable_)
     {
-        winList = p->SmoothWindow(winList);
+        winList = p->SmoothWindowWithId(winList);
     }
     return p->TransWindow(img, imgPad, winList);
 }
@@ -138,9 +139,6 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     if (detectFlag == p->period_)
     {
         std::vector<Window2> tmpList = p->Detect(img, imgPad);
-	if (p->stable_)
-		//This smoothing step is in order to align IDs
-		tmpList = p->SmoothWindow(tmpList);
 
         for (int i = 0; i < tmpList.size(); i++)
         {
@@ -153,7 +151,7 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     winList = p->DeleteFP(winList);
     if (p->stable_)
     {
-        winList = p->SmoothWindow(winList);
+        winList = p->SmoothWindowWithId(winList);
     }
     preList = winList;
     detectFlag--;
@@ -538,18 +536,18 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
             if (Legal(x, y, imgTmp) && Legal(x + w - 1, y + w - 1, imgTmp))
             {
                 if (abs(winList[i].angle)  < EPS)
-                    ret.push_back(Window2(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0),global_id_));
+                    ret.push_back(Window2(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
                 else if (abs(winList[i].angle - 180)  < EPS)
                 {
-                    ret.push_back(Window2(x, height - 1 -  (y + w - 1), w, w, 180 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),global_id_));
+                    ret.push_back(Window2(x, height - 1 -  (y + w - 1), w, w, 180 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
                 }
                 else if (abs(winList[i].angle - 90)  < EPS)
                 {
-                    ret.push_back(Window2(y, x, w, w, 90 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),global_id_));
+                    ret.push_back(Window2(y, x, w, w, 90 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
                 }
                 else
                 {
-                    ret.push_back(Window2(width - y - w, x, w, w, -90 + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),global_id_));
+                    ret.push_back(Window2(width - y - w, x, w, w, -90 + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
                 }
             }
         }
@@ -577,7 +575,6 @@ std::vector<Window> Impl::TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<W
     }
     return ret;
 }
-
 std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
 {
     static std::vector<Window2> preList;
@@ -593,15 +590,11 @@ std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
                 winList[i].w = preList[j].w;
                 winList[i].h = preList[j].h;
                 winList[i].angle = preList[j].angle;
-		winList[i].id = preList[j].id;
-		if (winList[i].points14.empty()) 
-			winList[i].points14 = preList[j].points14; // in case this window just detected
-		else
-			for (int k = 0; k < preList[j].points14.size(); k++)
-			{
-			    winList[i].points14[k].x = (4 * winList[i].points14[k].x + 6 * preList[j].points14[k].x) / 10.0;
-			    winList[i].points14[k].y = (4 * winList[i].points14[k].y + 6 * preList[j].points14[k].y) / 10.0;
-			}
+                for (int k = 0; k < preList[j].points14.size(); k++)
+                {
+                    winList[i].points14[k].x = (4 * winList[i].points14[k].x + 6 * preList[j].points14[k].x) / 10.0;
+                    winList[i].points14[k].y = (4 * winList[i].points14[k].y + 6 * preList[j].points14[k].y) / 10.0;
+                }
             }
             else if (IoU(winList[i], preList[j]) > 0.6)
             {
@@ -611,19 +604,55 @@ std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
                 winList[i].w = (winList[i].w + preList[j].w) / 2;
                 winList[i].h = (winList[i].h + preList[j].h) / 2;
                 winList[i].angle = SmoothAngle(winList[i].angle, preList[j].angle);
-		winList[i].id = preList[j].id;
-		if (winList[i].points14.empty()) 
-			winList[i].points14 = preList[j].points14; // in case this window just detected
-		else
-			for (int k = 0; k < preList[j].points14.size(); k++)
-			{
-			    winList[i].points14[k].x = (7 * winList[i].points14[k].x + 3 * preList[j].points14[k].x) / 10.0;
-			    winList[i].points14[k].y = (7 * winList[i].points14[k].y + 3 * preList[j].points14[k].y) / 10.0;
-			}
-            }else{
-		winList[i].id = global_id_++; //New window.. Assign ID
-	    }
+                for (int k = 0; k < preList[j].points14.size(); k++)
+                {
+                    winList[i].points14[k].x = (7 * winList[i].points14[k].x + 3 * preList[j].points14[k].x) / 10.0;
+                    winList[i].points14[k].y = (7 * winList[i].points14[k].y + 3 * preList[j].points14[k].y) / 10.0;
+                }
+            }
         }
+    }
+    preList = winList;
+    return winList;
+}
+
+#define kMinIoUTracking 0.1
+std::vector<Window2> Impl::SmoothWindowWithId(std::vector<Window2> winList)
+{
+    static std::vector<Window2> preList;
+    for (int i = 0; i < winList.size(); i++)
+    {
+	int jmax = -1;//Hold max IOU index window
+	float max_iou = 0;
+	
+	//Find max IOU	
+        for (int j = 0; j < preList.size(); j++)
+	{
+	    float iou = IoU(winList[i], preList[j]);
+	    if (iou > max_iou){
+		    jmax = j;
+	    	    max_iou = iou;
+	    }
+	}
+
+	if (max_iou > kMinIoUTracking) {
+	    winList[i].conf = (winList[i].conf + preList[jmax].conf) / 2;
+	    winList[i].x = (max_iou*winList[i].x + (1-max_iou)*preList[jmax].x);
+	    winList[i].y = (max_iou*winList[i].y + (1-max_iou)*preList[jmax].y);
+	    winList[i].w = (max_iou*winList[i].w + (1-max_iou)*preList[jmax].w);
+	    winList[i].h = (max_iou*winList[i].h + (1-max_iou)*preList[jmax].h);
+	    winList[i].angle = SmoothAngle(winList[i].angle, preList[jmax].angle);
+	    winList[i].id = preList[jmax].id; 
+	    if (winList[i].points14.empty()) 
+	    	winList[i].points14 = preList[jmax].points14; // in case this window just detected
+	    else
+	    	for (int k = 0; k < preList[jmax].points14.size(); k++) {
+	    	    winList[i].points14[k].x = (max_iou * winList[i].points14[k].x + (1-max_iou) * preList[jmax].points14[k].x);
+	    	    winList[i].points14[k].y = (max_iou * winList[i].points14[k].y + (1-max_iou) * preList[jmax].points14[k].y);
+	    	}
+	}else{
+	    winList[i].id = global_id_++; 
+	}
     }
     preList = winList;
     return winList;

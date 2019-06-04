@@ -3,15 +3,11 @@
 #include "PCN.h"
 
 #define kFeaturePoints 14
-struct CPoint{
-	int x;
-	int y;
-};
 struct CWindow{
 	int x, y, width, angle;
 	float score;
 	int id;
-	struct CPoint points[kFeaturePoints];
+	cv::Point points[kFeaturePoints];
 
 	void from_window(Window win)
 	{
@@ -21,11 +17,7 @@ struct CWindow{
 		angle = win.angle;
 		score = win.score;
 		id = win.id;
-		//TODO memcpy..
-		for (int f=0; f< win.points14.size(); f++){
-			points[f].x = win.points14[f].x;
-			points[f].y = win.points14[f].y;
-		}
+		memcpy(points,&(win.points14[0]),kFeaturePoints*sizeof(cv::Point));
 	}
 };
 
@@ -81,9 +73,6 @@ extern "C"
 		PCN* detector = (PCN*) pcn;
 		delete detector;
 	}
-
-
-
 }
 
 
