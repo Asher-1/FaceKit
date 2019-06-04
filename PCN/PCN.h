@@ -26,9 +26,10 @@ struct Window
 {
     int x, y, width, angle;
     float score;
+    int id;
     std::vector<cv::Point> points14;
-    Window(int x_, int y_, int w_, int a_, float s_, std::vector<cv::Point> p14_)
-        : x(x_), y(y_), width(w_), angle(a_), score(s_), points14(p14_)
+    Window(int x_, int y_, int w_, int a_, float s_, int id_, std::vector<cv::Point> p14_)
+        : x(x_), y(y_), width(w_), angle(a_), score(s_), id(id_),points14(p14_)
     {}
 };
 
@@ -65,6 +66,8 @@ void DrawFace(cv::Mat img, Window face)
     pointList.push_back(RotatePoint(x2, y2, centerX, centerY, face.angle));
     pointList.push_back(RotatePoint(x2, y1, centerX, centerY, face.angle));
     DrawLine(img, pointList);
+    cv::putText(img, std::string("id:") + std::to_string(face.id),
+		    cv::Point(x1, y1), 2, 1, cv::Scalar(255, 0, 0));
 }
 
 void DrawPoints(cv::Mat img, Window face)
