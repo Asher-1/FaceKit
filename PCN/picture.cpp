@@ -13,7 +13,6 @@ int main()
     /// tracking
     detector.SetTrackingPeriod(30);
     detector.SetTrackingThresh(0.9);
-    detector.SetVideoSmooth(false);
 
     for (int i = 0; i <= 26; i++)
     {

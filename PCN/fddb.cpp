@@ -20,7 +20,6 @@ int main()
     /// tracking
     detector.SetTrackingPeriod(30);
     detector.SetTrackingThresh(0.9);
-    detector.SetVideoSmooth(false);
 
     while (std::getline(in, line))
     {
@@ -42,11 +41,11 @@ int main()
             if (abs(faces[i].angle) < 45 or abs(faces[i].angle) > 135)
                 out << faces[i].x << " " << faces[i].y - 0.1 * faces[i].width << " " <<
                     faces[i].width << " " << faces[i].width * 1.2 << " " <<
-                    faces[i].score << std::endl;
+                    faces[i].conf << std::endl;
             else
                 out << faces[i].x - 0.1 * faces[i].width << " " << faces[i].y << " " <<
                     faces[i].width * 1.2 << " " << faces[i].width << " " <<
-                    faces[i].score << std::endl;
+                    faces[i].conf << std::endl;
         }
     }
     in.close();

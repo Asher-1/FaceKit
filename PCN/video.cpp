@@ -13,7 +13,6 @@ int main()
     /// tracking
     detector.SetTrackingPeriod(30);
     detector.SetTrackingThresh(0.9);
-    detector.SetVideoSmooth(true);
 
     cv::VideoCapture capture(0);
     cv::Mat img;
@@ -23,7 +22,6 @@ int main()
         capture >> img;
         tm.reset();
         tm.start();
-        //std::vector<Window> faces = detector.Detect(img);
         std::vector<Window> faces = detector.DetectTrack(img);
         tm.stop();
         int fps = 1000.0 / tm.getTimeMilli();

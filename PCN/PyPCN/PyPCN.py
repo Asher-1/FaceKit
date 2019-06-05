@@ -7,19 +7,21 @@ import os
 #from ipdb import set_trace as dbg
 from enum import IntEnum
 
-class CPoint(Structure):
+class Point(Structure):
     _fields_ = [("x", c_int),
                 ("y", c_int)]
 
 FEAT_POINTS = 14
-class CWindow(Structure):
+class Window(Structure):
     _fields_ = [("x", c_int),
                 ("y", c_int),
                 ("width", c_int),
-                ("angle", c_int),
-                ("score", c_float),
-                ("id", c_int),
-                ("points",CPoint*14)]
+                ("height", c_int),
+                ("angle", c_float),
+                ("scale", c_float),
+                ("conf", c_float),
+                ("id", c_long),
+                ("points",Point*FEAT_POINTS)]
 
 class FeatEnam(IntEnum):
     CHIN_0 = 0
@@ -38,21 +40,20 @@ class FeatEnam(IntEnum):
     MOUTH_RIGHT = 13
     FEAT_POINTS = 14
 
-
 lib = CDLL("libPCN.so", RTLD_GLOBAL)
 
-init_detector = lib.init_detector
 #void *init_detector(const char *detection_model_path, 
 #            const char *pcn1_proto, const char *pcn2_proto, const char *pcn3_proto, 
 #            const char *tracking_model_path, const char *tracking_proto,
 #            int min_face_size, float pyramid_scale_factor, float detection_thresh_stage1,
 #            float detection_thresh_stage2, float detection_thresh_stage3, int tracking_period,
-#            float tracking_thresh, int do_smooth)
+#            float tracking_thresh)
+init_detector = lib.init_detector
 init_detector.argtypes = [
         c_char_p, c_char_p, c_char_p, 
         c_char_p, c_char_p, c_char_p,
         c_int,c_float,c_float,c_float,
-        c_float,c_int,c_float,c_int]
+        c_float,c_int,c_float]
 init_detector.restype = c_void_p
 
 #int get_detect_status(void* pcn)
@@ -60,12 +61,12 @@ get_detect_status = lib.get_detect_status
 get_detect_status.argtypes = [c_void_p]
 get_detect_status.restype = c_int
 
-#CWindow* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
+#Window* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
 detect_faces = lib.detect_faces
 detect_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]
-detect_faces.restype = POINTER(CWindow)
+detect_faces.restype = POINTER(Window)
 
-#void free_faces(CWindow* wins)
+#void free_faces(Window* wins)
 free_faces = lib.free_faces
 free_faces.argtypes= [c_void_p]
 
@@ -123,7 +124,7 @@ if __name__=="__main__":
 
     detector = init_detector(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
 			tracking_model_path,tracking_proto, 
-			15,1.45,0.5,0.5,0.98,30,0.9,1)
+			15,1.45,0.5,0.5,0.98,30,0.9)
 
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) # float

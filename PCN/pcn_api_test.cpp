@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 
 	PCN* detector = (PCN*) init_detector(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
 			tracking_model_path,tracking_proto,
-			40,1.45,0.5,0.5,0.98,30,0.9,1);
+			40,1.45,0.5,0.5,0.98,30,0.9);
 	cv::VideoCapture capture;
 	if (argc >1)
 		capture.open(argv[1]);
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 		tm.reset();
 		tm.start();
 
-		CWindow* wins = NULL;
+		Window* wins = NULL;
 		int lwin = -1;
 		wins = detect_faces(detector,img.data,img.rows, img.cols,&lwin);
 		tm.stop();
@@ -40,13 +40,15 @@ int main(int argc, char **argv)
 		cv::putText(img, std::string("PCN:") + ss.str() + "FPS",
 				cv::Point(20, 45), 4, 1, cv::Scalar(0, 0, 125));
 		for (int i = 0; i < lwin; i++){
+			cv::putText(img, std::string("id:") + std::to_string(wins[i].id),
+					cv::Point(wins[i].x,wins[i].y ), 1, 1, cv::Scalar(255, 0, 0));
 			for (int p=0; p < kFeaturePoints; p++){
-				cv::Point pt(wins[i].points[p].x,wins[i].points[p].y);
+				cv::Point pt(wins[i].points14[p].x,wins[i].points14[p].y);
 				cv::circle(img, pt, 2, RED, -1);
 			}
 		}
+		free_faces(wins);
 
-		free(wins);
 		cv::imshow("PCN", img);
 		if (cv::waitKey(1) == 'q')
 			break;

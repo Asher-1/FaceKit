@@ -1,16 +1,7 @@
 #include "PCN.h"
 #include "PCN_API.h"
 
-struct Window2
-{
-    int x, y, w, h;
-    float angle, scale, conf;
-    int id;
-    std::vector<cv::Point> points14;
-    Window2(int x_, int y_, int w_, int h_, float a_, float s_, float c_, int id_)
-        : x(x_), y(y_), w(w_), h(h_), angle(a_), scale(s_), conf(c_), id(id_)
-    {}
-};
+
 
 class Impl
 {
@@ -18,29 +9,28 @@ public:
     void LoadModel(std::string modelDetect, std::string net1, std::string net2, std::string net3,
                    std::string modelTrack, std::string netTrack);
     cv::Mat ResizeImg(cv::Mat img, float scale);
-    static bool CompareWin(const Window2 &w1, const Window2 &w2);
+    static bool CompareWin(const Window &w1, const Window &w2);
     bool Legal(int x, int y, cv::Mat img);
-    bool Inside(int x, int y, Window2 rect);
+    bool Inside(int x, int y, Window rect);
     int SmoothAngle(int a, int b);
-    std::vector<Window2> SmoothWindow(std::vector<Window2> winList);
-    std::vector<Window2> SmoothWindowWithId(std::vector<Window2> winList);
-    float IoU(Window2 &w1, Window2 &w2);
-    std::vector<Window2> NMS(std::vector<Window2> &winList, bool local, float threshold);
-    std::vector<Window2> DeleteFP(std::vector<Window2> &winList);
+    std::vector<Window> SmoothWindowWithId(std::vector<Window> winList);
+    float IoU(Window &w1, Window &w2);
+    std::vector<Window> NMS(std::vector<Window> &winList, bool local, float threshold);
+    std::vector<Window> DeleteFP(std::vector<Window> &winList);
     cv::Mat PreProcessImg(cv::Mat img);
     cv::Mat PreProcessImg(cv::Mat img,  int dim);
     void SetInput(cv::Mat input, caffe::shared_ptr<caffe::Net<float> > &net);
     void SetInput(std::vector<cv::Mat> &input, caffe::shared_ptr<caffe::Net<float> > &net);
     cv::Mat PadImg(cv::Mat img);
-    std::vector<Window> TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<Window2> &winList);
-    std::vector<Window2> Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<caffe::Net<float> > &net, float thres);
-    std::vector<Window2> Stage2(cv::Mat img, cv::Mat img180,
-                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window2> &winList);
-    std::vector<Window2> Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90,
-                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window2> &winList);
-    std::vector<Window2> Detect(cv::Mat img, cv::Mat imgPad);
-    std::vector<Window2> Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
-                               float thres, int dim, std::vector<Window2> &winList);
+    std::vector<Window> TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<Window> &winList);
+    std::vector<Window> Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<caffe::Net<float> > &net, float thres);
+    std::vector<Window> Stage2(cv::Mat img, cv::Mat img180,
+                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
+    std::vector<Window> Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90,
+                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
+    std::vector<Window> Detect(cv::Mat img, cv::Mat imgPad);
+    std::vector<Window> Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
+                               float thres, int dim, std::vector<Window> &winList);
 public:
     caffe::shared_ptr<caffe::Net<float> > net_[4];
     int minFace_;
@@ -49,13 +39,12 @@ public:
     float classThreshold_[3];
     float nmsThreshold_[3];
     float angleRange_;
-    bool stable_;
     int period_;
     float trackThreshold_;
     float augScale_;
     cv::Scalar mean_;
-    int global_id_;//Global ID incrementor
-    std::vector<Window2> preList;
+    long global_id_;//Global ID incrementor
+    std::vector<Window> preList;
 };
 
 PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
@@ -64,12 +53,6 @@ PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::strin
     Impl *p = (Impl *)impl_;
     p->LoadModel(modelDetect, net1, net2, net3, modelTrack, netTrack);
     p->global_id_ = 0;
-}
-
-void PCN::SetVideoSmooth(bool stable)
-{
-    Impl *p = (Impl *)impl_;
-    p->stable_ = stable;
 }
 
 void PCN::SetMinFaceSize(int minFace)
@@ -117,17 +100,11 @@ std::vector<Window> PCN::Detect(cv::Mat img)
 {
     Impl *p = (Impl *)impl_;
     cv::Mat imgPad = p->PadImg(img);
-    std::vector<Window2> winList = p->Detect(img, imgPad);
-    std::vector<Window2> pointsList = p->Track(imgPad, p->net_[3], -1, 96, winList);
+    std::vector<Window> winList = p->Detect(img, imgPad);
+    std::vector<Window> pointsList = p->Track(imgPad, p->net_[3], -1, 96, winList);
     for (int i = 0; i < winList.size(); i++)
-    {
-        winList[i].points14 = pointsList[i].points14;
-    }
-
-    if (p->stable_)
-    {
-        winList = p->SmoothWindowWithId(winList);
-    }
+	winList[i].set_points(pointsList[i].points14);
+    winList = p->SmoothWindowWithId(winList);
     return p->TransWindow(img, imgPad, winList);
 }
 
@@ -135,11 +112,10 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
 {
     Impl *p = (Impl *)impl_;
     cv::Mat imgPad = p->PadImg(img);
-    //static int detectFlag = p->period_;
-    std::vector<Window2> winList = p->preList;
+    std::vector<Window> winList = p->preList;
     if (detectFlag == p->period_)
     {
-        std::vector<Window2> tmpList = p->Detect(img, imgPad);
+        std::vector<Window> tmpList = p->Detect(img, imgPad);
 
         for (int i = 0; i < tmpList.size(); i++)
         {
@@ -150,10 +126,7 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     winList = p->Track(imgPad, p->net_[3], p->trackThreshold_, 96, winList);
     winList = p->NMS(winList, false, p->nmsThreshold_[2]);
     winList = p->DeleteFP(winList);
-    if (p->stable_)
-    {
-        winList = p->SmoothWindowWithId(winList);
-    }
+    winList = p->SmoothWindowWithId(winList);
     p->preList = winList;
     detectFlag--;
     if (detectFlag == 0)
@@ -243,7 +216,7 @@ cv::Mat Impl::ResizeImg(cv::Mat img, float scale)
     return ret;
 }
 
-bool Impl::CompareWin(const Window2 &w1, const Window2 &w2)
+bool Impl::CompareWin(const Window &w1, const Window &w2)
 {
     return w1.conf > w2.conf;
 }
@@ -256,9 +229,9 @@ bool Impl::Legal(int x, int y, cv::Mat img)
         return false;
 }
 
-bool Impl::Inside(int x, int y, Window2 rect)
+bool Impl::Inside(int x, int y, Window rect)
 {
-    if (x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h)
+    if (x >= rect.x && y >= rect.y && x < rect.x + rect.width && y < rect.y + rect.height)
         return true;
     else
         return false;
@@ -275,16 +248,16 @@ int Impl::SmoothAngle(int a, int b)
         return b + (360 - diff) / 2;
 }
 
-float Impl::IoU(Window2 &w1, Window2 &w2)
+float Impl::IoU(Window &w1, Window &w2)
 {
-    float xOverlap = std::max(0, std::min(w1.x + w1.w - 1, w2.x + w2.w - 1) - std::max(w1.x, w2.x) + 1);
-    float yOverlap = std::max(0, std::min(w1.y + w1.h - 1, w2.y + w2.h - 1) - std::max(w1.y, w2.y) + 1);
+    float xOverlap = std::max(0, std::min(w1.x + w1.width - 1, w2.x + w2.width - 1) - std::max(w1.x, w2.x) + 1);
+    float yOverlap = std::max(0, std::min(w1.y + w1.height - 1, w2.y + w2.height - 1) - std::max(w1.y, w2.y) + 1);
     float intersection = xOverlap * yOverlap;
-    float unio = w1.w * w1.h + w2.w * w2.h - intersection;
+    float unio = w1.width * w1.height + w2.width * w2.height - intersection;
     return float(intersection) / unio;
 }
 
-std::vector<Window2> Impl::NMS(std::vector<Window2> &winList, bool local, float threshold)
+std::vector<Window> Impl::NMS(std::vector<Window> &winList, bool local, float threshold)
 {
     if (winList.size() == 0)
         return winList;
@@ -303,7 +276,7 @@ std::vector<Window2> Impl::NMS(std::vector<Window2> &winList, bool local, float 
                 flag[j] = 1;
         }
     }
-    std::vector<Window2> ret;
+    std::vector<Window> ret;
     for (int i = 0; i < winList.size(); i++)
     {
         if (!flag[i]) ret.push_back(winList[i]);
@@ -312,7 +285,7 @@ std::vector<Window2> Impl::NMS(std::vector<Window2> &winList, bool local, float 
 }
 
 /// to delete some false positives
-std::vector<Window2> Impl::DeleteFP(std::vector<Window2> &winList)
+std::vector<Window> Impl::DeleteFP(std::vector<Window> &winList)
 {
     if (winList.size() == 0)
         return winList;
@@ -325,11 +298,11 @@ std::vector<Window2> Impl::DeleteFP(std::vector<Window2> &winList)
             continue;
         for (int j = i + 1; j < winList.size(); j++)
         {
-            if (Inside(winList[j].x, winList[j].y, winList[i]) && Inside(winList[j].x + winList[j].w - 1, winList[j].y + winList[j].h - 1, winList[i]))
+            if (Inside(winList[j].x, winList[j].y, winList[i]) && Inside(winList[j].x + winList[j].width - 1, winList[j].y + winList[j].height - 1, winList[i]))
                 flag[j] = 1;
         }
     }
-    std::vector<Window2> ret;
+    std::vector<Window> ret;
     for (int i = 0; i < winList.size(); i++)
     {
         if (!flag[i]) ret.push_back(winList[i]);
@@ -347,11 +320,11 @@ cv::Mat Impl::PadImg(cv::Mat img)
     return ret;
 }
 
-std::vector<Window2> Impl::Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<caffe::Net<float> > &net, float thres)
+std::vector<Window> Impl::Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<caffe::Net<float> > &net, float thres)
 {
     int row = (imgPad.rows - img.rows) / 2;
     int col = (imgPad.cols - img.cols) / 2;
-    std::vector<Window2> winList;
+    std::vector<Window> winList;
     int netSize = 24;
     float curScale;
     curScale = minFace_ / float(netSize);
@@ -379,9 +352,9 @@ std::vector<Window2> Impl::Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr
                     if (Legal(rx, ry, imgPad) && Legal(rx + rw - 1, ry + rw - 1, imgPad))
                     {
                         if (rotateProb->data_at(0, 1, i, j) > 0.5)
-                            winList.push_back(Window2(rx, ry, rw, rw, 0, curScale, prob->data_at(0, 1, i, j),-1));
+                            winList.push_back(Window(rx, ry, rw, rw, 0, curScale, prob->data_at(0, 1, i, j)));
                         else
-                            winList.push_back(Window2(rx, ry, rw, rw, 180, curScale, prob->data_at(0, 1, i, j),-1));
+                            winList.push_back(Window(rx, ry, rw, rw, 180, curScale, prob->data_at(0, 1, i, j)));
                     }
                 }
             }
@@ -392,7 +365,7 @@ std::vector<Window2> Impl::Stage1(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr
     return winList;
 }
 
-std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window2> &winList)
+std::vector<Window> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList)
 {
     if (winList.size() == 0)
         return winList;
@@ -401,11 +374,11 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
     for (int i = 0; i < winList.size(); i++)
     {
         if (abs(winList[i].angle) < EPS)
-            dataList.push_back(PreProcessImg(img(cv::Rect(winList[i].x, winList[i].y, winList[i].w, winList[i].h)), dim));
+            dataList.push_back(PreProcessImg(img(cv::Rect(winList[i].x, winList[i].y, winList[i].width, winList[i].height)), dim));
         else
         {
-            int y2 = winList[i].y + winList[i].h - 1;
-            dataList.push_back(PreProcessImg(img180(cv::Rect(winList[i].x, height - 1 - y2, winList[i].w, winList[i].h)), dim));
+            int y2 = winList[i].y + winList[i].height - 1;
+            dataList.push_back(PreProcessImg(img180(cv::Rect(winList[i].x, height - 1 - y2, winList[i].width, winList[i].height)), dim));
         }
     }
     SetInput(dataList, net);
@@ -413,7 +386,7 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
     caffe::Blob<float>* reg = net->output_blobs()[0];
     caffe::Blob<float>* prob = net->output_blobs()[1];
     caffe::Blob<float>* rotateProb = net->output_blobs()[2];
-    std::vector<Window2> ret;
+    std::vector<Window> ret;
     for (int i = 0; i < winList.size(); i++)
     {
         if (prob->data_at(i, 1, 0, 0) > thres)
@@ -423,7 +396,7 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
             float yn = reg->data_at(i, 2, 0, 0);
             int cropX = winList[i].x;
             int cropY = winList[i].y;
-            int cropW = winList[i].w;
+            int cropW = winList[i].width;
             if (abs(winList[i].angle)  > EPS)
                 cropY = height - 1 - (cropY + cropW - 1);
             int w = sn * cropW;
@@ -450,7 +423,7 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
                         angle = 0;
                     else
                         angle = -90;
-                    ret.push_back(Window2(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 }
                 else
                 {
@@ -460,7 +433,7 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
                         angle = 180;
                     else
                         angle = -90;
-                    ret.push_back(Window2(x, height - 1 -  (y + w - 1), w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(x, height - 1 -  (y + w - 1), w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 }
             }
         }
@@ -468,7 +441,7 @@ std::vector<Window2> Impl::Stage2(cv::Mat img, cv::Mat img180, caffe::shared_ptr
     return ret;
 }
 
-std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window2> &winList)
+std::vector<Window> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList)
 {
     if (winList.size() == 0)
         return winList;
@@ -478,21 +451,21 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
     for (int i = 0; i < winList.size(); i++)
     {
         if (abs(winList[i].angle) < EPS)
-            dataList.push_back(PreProcessImg(img(cv::Rect(winList[i].x, winList[i].y, winList[i].w, winList[i].h)), dim));
+            dataList.push_back(PreProcessImg(img(cv::Rect(winList[i].x, winList[i].y, winList[i].width, winList[i].height)), dim));
         else if (abs(winList[i].angle - 90) < EPS)
         {
-            dataList.push_back(PreProcessImg(img90(cv::Rect(winList[i].y, winList[i].x, winList[i].h, winList[i].w)), dim));
+            dataList.push_back(PreProcessImg(img90(cv::Rect(winList[i].y, winList[i].x, winList[i].height, winList[i].width)), dim));
         }
         else if (abs(winList[i].angle + 90) < EPS)
         {
             int x = winList[i].y;
-            int y = width - 1 - (winList[i].x + winList[i].w - 1);
-            dataList.push_back(PreProcessImg(imgNeg90(cv::Rect(x, y, winList[i].w, winList[i].h)), dim));
+            int y = width - 1 - (winList[i].x + winList[i].width - 1);
+            dataList.push_back(PreProcessImg(imgNeg90(cv::Rect(x, y, winList[i].width, winList[i].height)), dim));
         }
         else
         {
-            int y2 = winList[i].y + winList[i].h - 1;
-            dataList.push_back(PreProcessImg(img180(cv::Rect(winList[i].x, height - 1 - y2, winList[i].w, winList[i].h)), dim));
+            int y2 = winList[i].y + winList[i].height - 1;
+            dataList.push_back(PreProcessImg(img180(cv::Rect(winList[i].x, height - 1 - y2, winList[i].width, winList[i].height)), dim));
         }
     }
     SetInput(dataList, net);
@@ -500,7 +473,7 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
     caffe::Blob<float>* reg = net->output_blobs()[0];
     caffe::Blob<float>* prob = net->output_blobs()[1];
     caffe::Blob<float>* rotateProb = net->output_blobs()[2];
-    std::vector<Window2> ret;
+    std::vector<Window> ret;
     for (int i = 0; i < winList.size(); i++)
     {
         if (prob->data_at(i, 1, 0, 0) > thres)
@@ -510,7 +483,7 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
             float yn = reg->data_at(i, 2, 0, 0);
             int cropX = winList[i].x;
             int cropY = winList[i].y;
-            int cropW = winList[i].w;
+            int cropW = winList[i].width;
             cv::Mat imgTmp = img;
             if (abs(winList[i].angle - 180)  < EPS)
             {
@@ -525,7 +498,7 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
             else if (abs(winList[i].angle + 90)  < EPS)
             {
                 cropX = winList[i].y;
-                cropY = width - 1 - (winList[i].x + winList[i].w - 1);
+                cropY = width - 1 - (winList[i].x + winList[i].width - 1);
                 imgTmp = imgNeg90;
             }
 
@@ -537,18 +510,18 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
             if (Legal(x, y, imgTmp) && Legal(x + w - 1, y + w - 1, imgTmp))
             {
                 if (abs(winList[i].angle)  < EPS)
-                    ret.push_back(Window2(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(x, y, w, w, angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 else if (abs(winList[i].angle - 180)  < EPS)
                 {
-                    ret.push_back(Window2(x, height - 1 -  (y + w - 1), w, w, 180 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(x, height - 1 -  (y + w - 1), w, w, 180 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 }
                 else if (abs(winList[i].angle - 90)  < EPS)
                 {
-                    ret.push_back(Window2(y, x, w, w, 90 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(y, x, w, w, 90 - angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 }
                 else
                 {
-                    ret.push_back(Window2(width - y - w, x, w, w, -90 + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),-1));
+                    ret.push_back(Window(width - y - w, x, w, w, -90 + angle, winList[i].scale, prob->data_at(i, 1, 0, 0)));
                 }
             }
         }
@@ -556,7 +529,7 @@ std::vector<Window2> Impl::Stage3(cv::Mat img, cv::Mat img180, cv::Mat img90, cv
     return ret;
 }
 
-std::vector<Window> Impl::TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<Window2> &winList)
+std::vector<Window> Impl::TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<Window> &winList)
 {
     int row = (imgPad.rows - img.rows) / 2;
     int col = (imgPad.cols - img.cols) / 2;
@@ -564,63 +537,32 @@ std::vector<Window> Impl::TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<W
     std::vector<Window> ret;
     for(int i = 0; i < winList.size(); i++)
     {
-        if (winList[i].w > 0 && winList[i].h > 0)
+        if (winList[i].width > 0 && winList[i].height > 0)
         {
-            for (int j = 0; j < winList[i].points14.size(); j++)
+            for (int j = 0; j < kFeaturePoints; j++)
             {
                 winList[i].points14[j].x -= col;
                 winList[i].points14[j].y -= row;
             }
-            ret.push_back(Window(winList[i].x - col, winList[i].y - row, winList[i].w, winList[i].angle, winList[i].conf, winList[i].id,winList[i].points14));
+            ret.push_back(
+			    Window( winList[i].x - col, 
+				    winList[i].y - row, 
+				    winList[i].width, 
+				    winList[i].height, 
+				    winList[i].angle, 
+				    winList[i].scale, 
+				    winList[i].conf, 
+				    winList[i].id,
+				    winList[i].points14));
         }
     }
     return ret;
 }
-std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
-{
-    //static std::vector<Window2> preList;
-    for (int i = 0; i < winList.size(); i++)
-    {
-        for (int j = 0; j < preList.size(); j++)
-        {
-            if (IoU(winList[i], preList[j]) > 0.9)
-            {
-                winList[i].conf = (winList[i].conf + preList[j].conf) / 2;
-                winList[i].x = preList[j].x;
-                winList[i].y = preList[j].y;
-                winList[i].w = preList[j].w;
-                winList[i].h = preList[j].h;
-                winList[i].angle = preList[j].angle;
-                for (int k = 0; k < preList[j].points14.size(); k++)
-                {
-                    winList[i].points14[k].x = (4 * winList[i].points14[k].x + 6 * preList[j].points14[k].x) / 10.0;
-                    winList[i].points14[k].y = (4 * winList[i].points14[k].y + 6 * preList[j].points14[k].y) / 10.0;
-                }
-            }
-            else if (IoU(winList[i], preList[j]) > 0.6)
-            {
-                winList[i].conf = (winList[i].conf + preList[j].conf) / 2;
-                winList[i].x = (winList[i].x + preList[j].x) / 2;
-                winList[i].y = (winList[i].y + preList[j].y) / 2;
-                winList[i].w = (winList[i].w + preList[j].w) / 2;
-                winList[i].h = (winList[i].h + preList[j].h) / 2;
-                winList[i].angle = SmoothAngle(winList[i].angle, preList[j].angle);
-                for (int k = 0; k < preList[j].points14.size(); k++)
-                {
-                    winList[i].points14[k].x = (7 * winList[i].points14[k].x + 3 * preList[j].points14[k].x) / 10.0;
-                    winList[i].points14[k].y = (7 * winList[i].points14[k].y + 3 * preList[j].points14[k].y) / 10.0;
-                }
-            }
-        }
-    }
-    preList = winList;
-    return winList;
-}
 
 #define kMinIoUTracking 0.1
-std::vector<Window2> Impl::SmoothWindowWithId(std::vector<Window2> winList)
+std::vector<Window> Impl::SmoothWindowWithId(std::vector<Window> winList)
 {
-    //static std::vector<Window2> preList;
+    //static std::vector<Window> preList;
     for (int i = 0; i < winList.size(); i++)
     {
 	int jmax = -1;//Hold max IOU index window
@@ -640,17 +582,19 @@ std::vector<Window2> Impl::SmoothWindowWithId(std::vector<Window2> winList)
 	    winList[i].conf = (winList[i].conf + preList[jmax].conf) / 2;
 	    winList[i].x = (max_iou*winList[i].x + (1-max_iou)*preList[jmax].x);
 	    winList[i].y = (max_iou*winList[i].y + (1-max_iou)*preList[jmax].y);
-	    winList[i].w = (max_iou*winList[i].w + (1-max_iou)*preList[jmax].w);
-	    winList[i].h = (max_iou*winList[i].h + (1-max_iou)*preList[jmax].h);
+	    winList[i].width = (max_iou*winList[i].width + (1-max_iou)*preList[jmax].width);
+	    winList[i].height = (max_iou*winList[i].height + (1-max_iou)*preList[jmax].height);
 	    winList[i].angle = SmoothAngle(winList[i].angle, preList[jmax].angle);
-	    winList[i].id = preList[jmax].id; 
-	    if (winList[i].points14.empty()) 
-	    	winList[i].points14 = preList[jmax].points14; // in case this window just detected
+
+	    if (winList[i].id < 0) // in case this window just detected
+		winList[i].set_points(preList[jmax].points14);
 	    else
-	    	for (int k = 0; k < preList[jmax].points14.size(); k++) {
+	    	for (int k = 0; k < kFeaturePoints; k++) {
 	    	    winList[i].points14[k].x = (max_iou * winList[i].points14[k].x + (1-max_iou) * preList[jmax].points14[k].x);
 	    	    winList[i].points14[k].y = (max_iou * winList[i].points14[k].y + (1-max_iou) * preList[jmax].points14[k].y);
 	    	}
+	    winList[i].id = preList[jmax].id; 
+	   
 	}else{
 	    winList[i].id = global_id_++; 
 	}
@@ -659,14 +603,14 @@ std::vector<Window2> Impl::SmoothWindowWithId(std::vector<Window2> winList)
     return winList;
 }
 
-std::vector<Window2> Impl::Detect(cv::Mat img, cv::Mat imgPad)
+std::vector<Window> Impl::Detect(cv::Mat img, cv::Mat imgPad)
 {
     cv::Mat img180, img90, imgNeg90;
     cv::flip(imgPad, img180, 0);
     cv::transpose(imgPad, img90);
     cv::flip(img90, imgNeg90, 0);
 
-    std::vector<Window2> winList = Stage1(img, imgPad, net_[0], classThreshold_[0]);
+    std::vector<Window> winList = Stage1(img, imgPad, net_[0], classThreshold_[0]);
     winList = NMS(winList, true, nmsThreshold_[0]);
 
     winList = Stage2(imgPad, img180, net_[1], classThreshold_[1], 24, winList);
@@ -678,17 +622,20 @@ std::vector<Window2> Impl::Detect(cv::Mat img, cv::Mat imgPad)
     return winList;
 }
 
-std::vector<Window2> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
-                                 float thres, int dim, std::vector<Window2> &winList)
+std::vector<Window> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
+                                 float thres, int dim, std::vector<Window> &winList)
 {
     if (winList.size() == 0)
         return winList;
     std::vector<Window> tmpWinList;
     for (int i = 0; i < winList.size(); i++)
     {
-        Window win(winList[i].x - augScale_ * winList[i].w,
-                   winList[i].y - augScale_ * winList[i].w,
-                   winList[i].w + 2 * augScale_ * winList[i].w, winList[i].angle, winList[i].conf, winList[i].id, winList[i].points14);
+        Window win(winList[i].x - augScale_ * winList[i].width,
+                   winList[i].y - augScale_ * winList[i].width,
+                   winList[i].width + 2 * augScale_ * winList[i].width, 
+                   winList[i].height + 2 * augScale_ * winList[i].height, 
+		   winList[i].angle, winList[i].scale, 
+		   winList[i].conf, winList[i].id, winList[i].points14);
         tmpWinList.push_back(win);
     }
     std::vector<cv::Mat> dataList;
@@ -702,7 +649,7 @@ std::vector<Window2> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float
     caffe::Blob<float>* prob = net->output_blobs()[1];
     caffe::Blob<float>* pointsReg = net->output_blobs()[2];
     caffe::Blob<float>* rotateProb = net->output_blobs()[3];
-    std::vector<Window2> ret;
+    std::vector<Window> ret;
     for (int i = 0; i < tmpWinList.size(); i++)
     {
         if (prob->data_at(i, 1, 0, 0) > thres)
@@ -736,20 +683,18 @@ std::vector<Window2> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float
                     int tmpW = w / (1 + 2 * augScale_);
                     if (tmpW >= 20)
                     {
-                        ret.push_back(Window2(x + augScale_ * tmpW,
+                        ret.push_back(Window(x + augScale_ * tmpW,
                                               y + augScale_ * tmpW,
-                                              tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id));
-                        ret[ret.size() - 1].points14 = points14;
+                                              tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0]));
                     }
                 }
             }
             else
             {
                 int tmpW = w / (1 + 2 * augScale_);
-                ret.push_back(Window2(x + augScale_ * tmpW,
+                ret.push_back(Window(x + augScale_ * tmpW,
                                       y + augScale_ * tmpW,
-                                      tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id));
-                ret[ret.size() - 1].points14 = points14;
+                                      tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0]));
             }
         }
     }

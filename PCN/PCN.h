@@ -22,15 +22,31 @@
 #define RED CV_RGB(255, 0, 0)
 #define PURPLE CV_RGB(139, 0, 255)
 
+#define kFeaturePoints 14
+
 struct Window
 {
-    int x, y, width, angle;
-    float score;
-    int id;
-    std::vector<cv::Point> points14;
-    Window(int x_, int y_, int w_, int a_, float s_, int id_, std::vector<cv::Point> p14_)
-        : x(x_), y(y_), width(w_), angle(a_), score(s_), id(id_),points14(p14_)
+    int x, y, width,height;
+    float angle, scale;
+    float conf;
+    long id;
+    cv::Point points14[kFeaturePoints];
+
+    Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_, long id_, cv::Point p14_[kFeaturePoints])
+        : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(id_)
+    {
+	    set_points(p14_);
+    }
+    
+    //New window without points and ID
+    Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_)
+        : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(-1)
     {}
+
+    void set_points(cv::Point p14_[])
+    {
+	    memcpy(points14,&(p14_[0]),kFeaturePoints*sizeof(cv::Point));
+    }
 };
 
 cv::Point RotatePoint(float x, float y, float centerX, float centerY, float angle)
@@ -73,24 +89,21 @@ void DrawFace(cv::Mat img, Window face)
 void DrawPoints(cv::Mat img, Window face)
 {
     int width = 2;
-    if (face.points14.size() == 14)
+    for (int i = 1; i <= 8; i++)
+        cv::line(img, face.points14[i - 1], face.points14[i], BLUE, width);
+
+    for (int i = 0; i < kFeaturePoints; i++)
     {
-        for (int i = 1; i <= 8; i++)
-        {
-            cv::line(img, face.points14[i - 1], face.points14[i], BLUE, width);
-        }
-        for (int i = 0; i < face.points14.size(); i++)
-        {
-            if (i <= 8)
-                cv::circle(img, face.points14[i], width, CYAN, -1);
-            else if (i <= 9)
-                cv::circle(img, face.points14[i], width, GREEN, -1);
-            else if (i <= 11)
-                cv::circle(img, face.points14[i], width, PURPLE, -1);
-            else
-                cv::circle(img, face.points14[i], width, RED, -1);
-        }
+        if (i <= 8)
+            cv::circle(img, face.points14[i], width, CYAN, -1);
+        else if (i <= 9)
+            cv::circle(img, face.points14[i], width, GREEN, -1);
+        else if (i <= 11)
+            cv::circle(img, face.points14[i], width, PURPLE, -1);
+        else
+            cv::circle(img, face.points14[i], width, RED, -1);
     }
+    
 }
 
 cv::Mat CropFace(cv::Mat img, Window face, int cropSize)
@@ -128,13 +141,11 @@ public:
     /// tracking
     void SetTrackingPeriod(int period);
     void SetTrackingThresh(float thresh);
-    void SetVideoSmooth(bool smooth);
     std::vector<Window> DetectTrack(cv::Mat img);
     int detectFlag;
 
 private:
     void* impl_;
-    //std::vector<Window2> preList;
 };
 
 #endif

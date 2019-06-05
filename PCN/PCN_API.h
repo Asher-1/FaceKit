@@ -3,24 +3,6 @@
 #include "PCN.h"
 
 #define kFeaturePoints 14
-struct CWindow{
-	int x, y, width, angle;
-	float score;
-	int id;
-	cv::Point points[kFeaturePoints];
-
-	void from_window(Window win)
-	{
-		x = win.x;
-		y = win.y;
-		width = win.width;
-		angle = win.angle;
-		score = win.score;
-		id = win.id;
-		memcpy(points,&(win.points14[0]),kFeaturePoints*sizeof(cv::Point));
-	}
-};
-
 
 extern "C"
 {
@@ -29,7 +11,7 @@ extern "C"
 			const char *tracking_model_path, const char *tracking_proto,
 			int min_face_size, float pyramid_scale_factor, float detection_thresh_stage1,
 			float detection_thresh_stage2, float detection_thresh_stage3, int tracking_period,
-			float tracking_thresh, int do_smooth)
+			float tracking_thresh)
 	{
 		PCN *detector = new PCN(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
 				tracking_model_path,tracking_proto);
@@ -44,7 +26,6 @@ extern "C"
 		/// tracking
 		detector->SetTrackingPeriod(tracking_period);
 		detector->SetTrackingThresh(tracking_thresh);
-		detector->SetVideoSmooth((bool)do_smooth);
 		return static_cast<void*> (detector);
 	}
 	
@@ -53,22 +34,22 @@ extern "C"
 		return  detector->detectFlag;
 	}
 
-	//TODO: return static array
-	CWindow* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
+	Window* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
 	{
 		PCN* detector = (PCN*) pcn;
 		cv::Mat img(rows,cols, CV_8UC3, (void*)raw_img);
 		std::vector<Window> faces = detector->DetectTrack(img);
 
 		*lwin = faces.size();
-		CWindow* wins = (CWindow*)malloc(sizeof(CWindow)*(*lwin));
-		for (int i=0; i < *lwin; i++){
-			wins[i].from_window(faces[i]);
-		}
+		Window* wins = (Window*)malloc(sizeof(Window)*(*lwin));
+		memcpy(wins,&faces[0],*lwin * sizeof(Window));
+		//for (int i=0; i < *lwin; i++){
+		//	wins[i] = faces[i];
+		//}
 		return wins;
 	}
 
-	void free_faces(CWindow* wins)
+	void free_faces(Window* wins)
 	{
 		free(wins);
 	}
