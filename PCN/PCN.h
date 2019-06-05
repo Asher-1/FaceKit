@@ -130,9 +130,11 @@ public:
     void SetTrackingThresh(float thresh);
     void SetVideoSmooth(bool smooth);
     std::vector<Window> DetectTrack(cv::Mat img);
+    int detectFlag;
 
 private:
     void* impl_;
+    //std::vector<Window2> preList;
 };
 
 #endif

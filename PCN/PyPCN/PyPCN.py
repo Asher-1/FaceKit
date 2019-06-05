@@ -55,6 +55,11 @@ init_detector.argtypes = [
         c_float,c_int,c_float,c_int]
 init_detector.restype = c_void_p
 
+#int get_detect_status(void* pcn)
+get_detect_status = lib.get_detect_status
+get_detect_status.argtypes = [c_void_p]
+get_detect_status.restype = c_int
+
 #CWindow* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
 detect_faces = lib.detect_faces
 detect_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]

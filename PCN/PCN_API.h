@@ -47,6 +47,11 @@ extern "C"
 		detector->SetVideoSmooth((bool)do_smooth);
 		return static_cast<void*> (detector);
 	}
+	
+	int get_detect_status(void* pcn){
+		PCN* detector = (PCN*) pcn;
+		return  detector->detectFlag;
+	}
 
 	//TODO: return static array
 	CWindow* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)

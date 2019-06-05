@@ -55,6 +55,7 @@ public:
     float augScale_;
     cv::Scalar mean_;
     int global_id_;//Global ID incrementor
+    std::vector<Window2> preList;
 };
 
 PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
@@ -103,6 +104,7 @@ void PCN::SetTrackingPeriod(int period)
 {
     Impl *p = (Impl *)impl_;
     p->period_ = period;
+    detectFlag = period;
 }
 
 void PCN::SetTrackingThresh(float thres)
@@ -133,9 +135,8 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
 {
     Impl *p = (Impl *)impl_;
     cv::Mat imgPad = p->PadImg(img);
-    static int detectFlag = p->period_;
-    static std::vector<Window2> preList;
-    std::vector<Window2> winList = preList;
+    //static int detectFlag = p->period_;
+    std::vector<Window2> winList = p->preList;
     if (detectFlag == p->period_)
     {
         std::vector<Window2> tmpList = p->Detect(img, imgPad);
@@ -153,7 +154,7 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     {
         winList = p->SmoothWindowWithId(winList);
     }
-    preList = winList;
+    p->preList = winList;
     detectFlag--;
     if (detectFlag == 0)
         detectFlag = p->period_;
@@ -577,7 +578,7 @@ std::vector<Window> Impl::TransWindow(cv::Mat img, cv::Mat imgPad, std::vector<W
 }
 std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
 {
-    static std::vector<Window2> preList;
+    //static std::vector<Window2> preList;
     for (int i = 0; i < winList.size(); i++)
     {
         for (int j = 0; j < preList.size(); j++)
@@ -619,7 +620,7 @@ std::vector<Window2> Impl::SmoothWindow(std::vector<Window2> winList)
 #define kMinIoUTracking 0.1
 std::vector<Window2> Impl::SmoothWindowWithId(std::vector<Window2> winList)
 {
-    static std::vector<Window2> preList;
+    //static std::vector<Window2> preList;
     for (int i = 0; i < winList.size(); i++)
     {
 	int jmax = -1;//Hold max IOU index window
