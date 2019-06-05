@@ -104,7 +104,7 @@ std::vector<Window> PCN::Detect(cv::Mat img)
     std::vector<Window> pointsList = p->Track(imgPad, p->net_[3], -1, 96, winList);
     for (int i = 0; i < winList.size(); i++)
 	winList[i].set_points(pointsList[i].points14);
-    winList = p->SmoothWindowWithId(winList);
+    //winList = p->SmoothWindowWithId(winList);
     return p->TransWindow(img, imgPad, winList);
 }
 

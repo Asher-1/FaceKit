@@ -66,6 +66,11 @@ detect_faces = lib.detect_faces
 detect_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]
 detect_faces.restype = POINTER(Window)
 
+#Window* detect_and_track_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
+detect_and_track_faces = lib.detect_and_track_faces
+detect_and_track_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]
+detect_and_track_faces.restype = POINTER(Window)
+
 #void free_faces(Window* wins)
 free_faces = lib.free_faces
 free_faces.argtypes= [c_void_p]
@@ -135,7 +140,7 @@ if __name__=="__main__":
             break
         face_count = c_int(0)
         raw_data = frame.ctypes.data_as(POINTER(c_ubyte))
-        windows = detect_faces(detector, raw_data, 
+        windows = detect_and_track_faces(detector, raw_data, 
                 int(height), int(width),
                 pointer(face_count))
         for i in range(face_count.value):

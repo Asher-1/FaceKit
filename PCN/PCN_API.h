@@ -38,14 +38,23 @@ extern "C"
 	{
 		PCN* detector = (PCN*) pcn;
 		cv::Mat img(rows,cols, CV_8UC3, (void*)raw_img);
+		std::vector<Window> faces = detector->Detect(img);
+
+		*lwin = faces.size();
+		Window* wins = (Window*)malloc(sizeof(Window)*(*lwin));
+		memcpy(wins,&faces[0],*lwin * sizeof(Window));
+		return wins;
+	}
+
+	Window* detect_and_track_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
+	{
+		PCN* detector = (PCN*) pcn;
+		cv::Mat img(rows,cols, CV_8UC3, (void*)raw_img);
 		std::vector<Window> faces = detector->DetectTrack(img);
 
 		*lwin = faces.size();
 		Window* wins = (Window*)malloc(sizeof(Window)*(*lwin));
 		memcpy(wins,&faces[0],*lwin * sizeof(Window));
-		//for (int i=0; i < *lwin; i++){
-		//	wins[i] = faces[i];
-		//}
 		return wins;
 	}
 

@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 
 		Window* wins = NULL;
 		int lwin = -1;
-		wins = detect_faces(detector,img.data,img.rows, img.cols,&lwin);
+		wins = detect_and_track_faces(detector,img.data,img.rows, img.cols,&lwin);
 		tm.stop();
 		int fps = 1000.0 / tm.getTimeMilli();
 		std::stringstream ss;
