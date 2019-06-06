@@ -115,7 +115,6 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     std::vector<Window> winList = p->preList;
     if (p->detectFlag == p->period_)
     {
-	    printf("Detect\n");
         std::vector<Window> tmpList = p->Detect(img, imgPad);
 
         for (int i = 0; i < tmpList.size(); i++)
@@ -603,14 +602,14 @@ std::vector<Window> Impl::SmoothWindowWithId(std::vector<Window> winList)
 	    winList[i].id = preList[jmax].id; 
 	   
 	}else{
-	    detectFlag = 0;
+	    //detectFlag = 0;
 	    winList[i].id = global_id_++; 
 	}
     }
 
-    if ((preList.size() > winList.size()) | 
-		    (winList.size()==0))
-        detectFlag = 0;
+    //if ((preList.size() > winList.size()) | 
+    //    	    (winList.size()==0))
+    //    detectFlag = 0;
 
     preList = winList;
     return winList;
