@@ -31,7 +31,7 @@ extern "C"
 	
 	int get_detect_status(void* pcn){
 		PCN* detector = (PCN*) pcn;
-		return  detector->detectFlag;
+		return  detector->GetTrackingFrame();
 	}
 
 	Window* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)

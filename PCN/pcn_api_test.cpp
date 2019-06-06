@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 
 	PCN* detector = (PCN*) init_detector(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
 			tracking_model_path,tracking_proto,
-			40,1.45,0.5,0.5,0.98,30,0.9);
+			40,1.45,0.5,0.5,0.98,500,0.9);
 	cv::VideoCapture capture;
 	if (argc >1)
 		capture.open(argv[1]);

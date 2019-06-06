@@ -142,8 +142,7 @@ public:
     void SetTrackingPeriod(int period);
     void SetTrackingThresh(float thresh);
     std::vector<Window> DetectTrack(cv::Mat img);
-    int detectFlag;
-
+    int GetTrackingFrame();
 private:
     void* impl_;
 };

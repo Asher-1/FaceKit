@@ -45,6 +45,7 @@ public:
     cv::Scalar mean_;
     long global_id_;//Global ID incrementor
     std::vector<Window> preList;
+    int detectFlag;
 };
 
 PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
@@ -87,7 +88,7 @@ void PCN::SetTrackingPeriod(int period)
 {
     Impl *p = (Impl *)impl_;
     p->period_ = period;
-    detectFlag = period;
+    p->detectFlag = period;
 }
 
 void PCN::SetTrackingThresh(float thres)
@@ -104,7 +105,6 @@ std::vector<Window> PCN::Detect(cv::Mat img)
     std::vector<Window> pointsList = p->Track(imgPad, p->net_[3], -1, 96, winList);
     for (int i = 0; i < winList.size(); i++)
 	winList[i].set_points(pointsList[i].points14);
-    //winList = p->SmoothWindowWithId(winList);
     return p->TransWindow(img, imgPad, winList);
 }
 
@@ -113,8 +113,9 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     Impl *p = (Impl *)impl_;
     cv::Mat imgPad = p->PadImg(img);
     std::vector<Window> winList = p->preList;
-    if (detectFlag == p->period_)
+    if (p->detectFlag == p->period_)
     {
+	    printf("Detect\n");
         std::vector<Window> tmpList = p->Detect(img, imgPad);
 
         for (int i = 0; i < tmpList.size(); i++)
@@ -128,10 +129,16 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     winList = p->DeleteFP(winList);
     winList = p->SmoothWindowWithId(winList);
     p->preList = winList;
-    detectFlag--;
-    if (detectFlag == 0)
-        detectFlag = p->period_;
+    p->detectFlag--;
+    if (p->detectFlag <= 0)
+        p->detectFlag = p->period_;
     return p->TransWindow(img, imgPad, winList);
+}
+
+int PCN::GetTrackingFrame()
+{
+    Impl *p = (Impl *)impl_;
+    return p->detectFlag;
 }
 
 void Impl::LoadModel(std::string modelDetect, std::string net1, std::string net2, std::string net3,
@@ -596,9 +603,15 @@ std::vector<Window> Impl::SmoothWindowWithId(std::vector<Window> winList)
 	    winList[i].id = preList[jmax].id; 
 	   
 	}else{
+	    detectFlag = 0;
 	    winList[i].id = global_id_++; 
 	}
     }
+
+    if ((preList.size() > winList.size()) | 
+		    (winList.size()==0))
+        detectFlag = 0;
+
     preList = winList;
     return winList;
 }

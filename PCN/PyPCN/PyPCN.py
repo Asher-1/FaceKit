@@ -129,7 +129,7 @@ if __name__=="__main__":
 
     detector = init_detector(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
 			tracking_model_path,tracking_proto, 
-			15,1.45,0.5,0.5,0.98,30,0.9)
+			15,1.45,0.5,0.5,0.98,300,0.9)
 
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) # float
