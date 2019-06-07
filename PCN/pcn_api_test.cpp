@@ -47,7 +47,6 @@ int main(int argc, char **argv)
 				cv::circle(img, pt, 2, RED, -1);
 			}
 		}
-		free_faces(wins);
 
 		cv::imshow("PCN", img);
 		if (cv::waitKey(1) == 'q')

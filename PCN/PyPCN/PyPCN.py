@@ -71,9 +71,6 @@ detect_and_track_faces = lib.detect_and_track_faces
 detect_and_track_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]
 detect_and_track_faces.restype = POINTER(Window)
 
-#void free_faces(Window* wins)
-free_faces = lib.free_faces
-free_faces.argtypes= [c_void_p]
 
 # void free_detector(void *pcn)
 free_detector = lib.free_detector
@@ -146,7 +143,6 @@ if __name__=="__main__":
         for i in range(face_count.value):
             DrawFace(windows[i],frame)
             DrawPoints(windows[i],frame)
-        free_faces(windows)
 
         cv2.imshow('window', frame)
         if cv2.waitKey(10) & 0xFF == ord('q'):

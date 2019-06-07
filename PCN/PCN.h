@@ -43,50 +43,10 @@ struct Window
         : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(-1)
     {}
 
-    void set_points(cv::Point p14_[])
-    {
+    void set_points(cv::Point p14_[]) {
 	    memcpy(points14,&(p14_[0]),kFeaturePoints*sizeof(cv::Point));
     }
 };
-
-cv::Point RotatePoint(float x, float y, float centerX, float centerY, float angle)
-{
-    x -= centerX;
-    y -= centerY;
-    float theta = -angle * M_PI / 180;
-    float rx = centerX + x * std::cos(theta) - y * std::sin(theta);
-    float ry = centerY + x * std::sin(theta) + y * std::cos(theta);
-    return cv::Point(rx, ry);
-}
-
-void DrawLine(cv::Mat img, std::vector<cv::Point> pointList)
-{
-    int width = 2;
-    cv::line(img, pointList[0], pointList[1], CYAN, width);
-    cv::line(img, pointList[1], pointList[2], CYAN, width);
-    cv::line(img, pointList[2], pointList[3], CYAN, width);
-    cv::line(img, pointList[3], pointList[0], BLUE, width);
-}
-
-void DrawFace(cv::Mat img, Window face)
-{
-    float x1 = face.x;
-    float y1 = face.y;
-    float x2 = face.width + face.x - 1;
-    float y2 = face.width + face.y - 1;
-    float centerX = (x1 + x2) / 2;
-    float centerY = (y1 + y2) / 2;
-    std::vector<cv::Point> pointList;
-    pointList.push_back(RotatePoint(x1, y1, centerX, centerY, face.angle));
-    pointList.push_back(RotatePoint(x1, y2, centerX, centerY, face.angle));
-    pointList.push_back(RotatePoint(x2, y2, centerX, centerY, face.angle));
-    pointList.push_back(RotatePoint(x2, y1, centerX, centerY, face.angle));
-    DrawLine(img, pointList);
-    cv::putText(img, std::string("id:") + std::to_string(face.id),
-		    cv::Point(x1, y1), 2, 1, cv::Scalar(255, 0, 0));
-}
-
-
 
 class PCN
 {
@@ -109,7 +69,47 @@ public:
     static void DrawLine(cv::Mat img, std::vector<cv::Point> pointList);
     static cv::Point RotatePoint(float x, float y, float centerX, float centerY, float angle);
 private:
-    void* impl_;
+    void LoadModel_(std::string modelDetect, std::string net1, std::string net2, std::string net3,
+                   std::string modelTrack, std::string netTrack);
+    cv::Mat ResizeImg_(cv::Mat img, float scale);
+    static bool CompareWin_(const Window &w1, const Window &w2);
+    bool Legal_(int x, int y, cv::Mat img);
+    bool Inside_(int x, int y, Window rect);
+    int SmoothAngle_(int a, int b);
+    std::vector<Window> SmoothWindowWithId_(std::vector<Window> winList);
+    float IoU_(Window &w1, Window &w2);
+    std::vector<Window> NMS_(std::vector<Window> &winList, bool local, float threshold);
+    std::vector<Window> DeleteFP_(std::vector<Window> &winList);
+    cv::Mat PreProcessImg_(cv::Mat img);
+    cv::Mat PreProcessImg_(cv::Mat img,  int dim);
+    void SetInput_(cv::Mat input, caffe::shared_ptr<caffe::Net<float> > &net);
+    void SetInput_(std::vector<cv::Mat> &input, caffe::shared_ptr<caffe::Net<float> > &net);
+    cv::Mat PadImg_(cv::Mat img);
+    std::vector<Window> TransWindow_(cv::Mat img, cv::Mat imgPad, std::vector<Window> &winList);
+    std::vector<Window> Stage1_(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<caffe::Net<float> > &net, float thres);
+    std::vector<Window> Stage2_(cv::Mat img, cv::Mat img180,
+                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
+    std::vector<Window> Stage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90,
+                                caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
+    std::vector<Window> Detect_(cv::Mat img, cv::Mat imgPad);
+    std::vector<Window> Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
+                               float thres, int dim, std::vector<Window> &winList);
+
+    //private data
+    caffe::shared_ptr<caffe::Net<float> > net_[4];
+    int minFace_;
+    float scale_;
+    int stride_;
+    float classThreshold_[3];
+    float nmsThreshold_[3];
+    float angleRange_;
+    int period_;
+    float trackThreshold_;
+    float augScale_;
+    cv::Scalar mean_;
+    long global_id_; //Global ID incrementor
+    std::vector<Window> preList_;
+    int detectFlag_;
 };
 
 #endif
