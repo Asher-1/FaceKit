@@ -31,8 +31,8 @@ int main()
                     cv::Point(20, 45), 4, 1, cv::Scalar(0, 0, 125));
         for (int i = 0; i < faces.size(); i++)
         {
-            DrawFace(img, faces[i]);
-            DrawPoints(img, faces[i]);
+	    PCN::DrawFace(img, faces[i]);
+	    PCN::DrawPoints(img, faces[i]);
         }
         cv::imshow("PCN", img);
         if (cv::waitKey(1) == 'q')

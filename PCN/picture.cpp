@@ -28,8 +28,8 @@ int main()
                   tm.getTimeMilli() << " ms" << std::endl;
         for (int j = 0; j < faces.size(); j++)
         {
-            DrawFace(img, faces[j]);
-            DrawPoints(img, faces[j]);
+	    PCN::DrawFace(img, faces[j]);
+	    PCN::DrawPoints(img, faces[j]);
         }
         cv::imshow("PCN", img);
         cv::waitKey();

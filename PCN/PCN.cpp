@@ -140,6 +140,88 @@ int PCN::GetTrackingFrame()
     return p->detectFlag;
 }
 
+// Static functions
+cv::Mat PCN::CropFace(cv::Mat img, Window face, int cropSize)
+{
+    float x1 = face.x;
+    float y1 = face.y;
+    float x2 = face.width + face.x - 1;
+    float y2 = face.width + face.y - 1;
+    float centerX = (x1 + x2) / 2;
+    float centerY = (y1 + y2) / 2;
+    cv::Point2f srcTriangle[3];
+    cv::Point2f dstTriangle[3];
+    srcTriangle[0] = PCN::RotatePoint(x1, y1, centerX, centerY, face.angle);
+    srcTriangle[1] = PCN::RotatePoint(x1, y2, centerX, centerY, face.angle);
+    srcTriangle[2] = PCN::RotatePoint(x2, y2, centerX, centerY, face.angle);
+    dstTriangle[0] = cv::Point(0, 0);
+    dstTriangle[1] = cv::Point(0, cropSize - 1);
+    dstTriangle[2] = cv::Point(cropSize - 1, cropSize - 1);
+    cv::Mat rotMat = cv::getAffineTransform(srcTriangle, dstTriangle);
+    cv::Mat ret;
+    cv::warpAffine(img, ret, rotMat, cv::Size(cropSize, cropSize));
+    return ret;
+}
+
+void PCN::DrawPoints(cv::Mat img, Window face)
+{
+    int width = 2;
+    for (int i = 1; i <= 8; i++)
+        cv::line(img, face.points14[i - 1], face.points14[i], BLUE, width);
+
+    for (int i = 0; i < kFeaturePoints; i++)
+    {
+        if (i <= 8)
+            cv::circle(img, face.points14[i], width, CYAN, -1);
+        else if (i <= 9)
+            cv::circle(img, face.points14[i], width, GREEN, -1);
+        else if (i <= 11)
+            cv::circle(img, face.points14[i], width, PURPLE, -1);
+        else
+            cv::circle(img, face.points14[i], width, RED, -1);
+    }
+    
+}
+
+cv::Point PCN::RotatePoint(float x, float y, float centerX, float centerY, float angle)
+{
+    x -= centerX;
+    y -= centerY;
+    float theta = -angle * M_PI / 180;
+    float rx = centerX + x * std::cos(theta) - y * std::sin(theta);
+    float ry = centerY + x * std::sin(theta) + y * std::cos(theta);
+    return cv::Point(rx, ry);
+}
+
+void PCN::DrawLine(cv::Mat img, std::vector<cv::Point> pointList)
+{
+    int width = 2;
+    cv::line(img, pointList[0], pointList[1], CYAN, width);
+    cv::line(img, pointList[1], pointList[2], CYAN, width);
+    cv::line(img, pointList[2], pointList[3], CYAN, width);
+    cv::line(img, pointList[3], pointList[0], BLUE, width);
+}
+
+void PCN::DrawFace(cv::Mat img, Window face)
+{
+    float x1 = face.x;
+    float y1 = face.y;
+    float x2 = face.width + face.x - 1;
+    float y2 = face.width + face.y - 1;
+    float centerX = (x1 + x2) / 2;
+    float centerY = (y1 + y2) / 2;
+    std::vector<cv::Point> pointList;
+    pointList.push_back(PCN::RotatePoint(x1, y1, centerX, centerY, face.angle));
+    pointList.push_back(PCN::RotatePoint(x1, y2, centerX, centerY, face.angle));
+    pointList.push_back(PCN::RotatePoint(x2, y2, centerX, centerY, face.angle));
+    pointList.push_back(PCN::RotatePoint(x2, y1, centerX, centerY, face.angle));
+    PCN::DrawLine(img, pointList);
+    cv::putText(img, std::string("id:") + std::to_string(face.id),
+		    cv::Point(x1, y1), 2, 1, cv::Scalar(255, 0, 0));
+}
+
+
+
 void Impl::LoadModel(std::string modelDetect, std::string net1, std::string net2, std::string net3,
                      std::string modelTrack, std::string netTrack)
 {
@@ -653,8 +735,9 @@ std::vector<Window> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
     std::vector<cv::Mat> dataList;
     for (int i = 0; i < tmpWinList.size(); i++)
     {
-        dataList.push_back(PreProcessImg(CropFace(img, tmpWinList[i], dim), dim));
+        dataList.push_back(PreProcessImg(PCN::CropFace(img, tmpWinList[i], dim), dim));
     }
+    
     SetInput(dataList, net);
     net->Forward();
     caffe::Blob<float>* reg = net->output_blobs()[0];
@@ -674,7 +757,7 @@ std::vector<Window> Impl::Track(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
             std::vector<cv::Point> points14;
             for (int j = 0; j < pointsReg->shape(1) / 2; j++)
             {
-                points14.push_back(RotatePoint((pointsReg->data_at(i, 2 * j, 0, 0) + 0.5) * (cropW - 1) + cropX,
+                points14.push_back(PCN::RotatePoint((pointsReg->data_at(i, 2 * j, 0, 0) + 0.5) * (cropW - 1) + cropX,
                                                (pointsReg->data_at(i, 2 * j + 1, 0, 0) + 0.5) * (cropW - 1) + cropY,
                                                centerX, centerY, tmpWinList[i].angle));
             }

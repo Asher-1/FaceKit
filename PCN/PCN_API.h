@@ -6,6 +6,7 @@
 
 extern "C"
 {
+		
 	void *init_detector(const char *detection_model_path, 
 			const char *pcn1_proto, const char *pcn2_proto, const char *pcn3_proto, 
 			const char *tracking_model_path, const char *tracking_proto,

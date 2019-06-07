@@ -86,47 +86,7 @@ void DrawFace(cv::Mat img, Window face)
 		    cv::Point(x1, y1), 2, 1, cv::Scalar(255, 0, 0));
 }
 
-void DrawPoints(cv::Mat img, Window face)
-{
-    int width = 2;
-    for (int i = 1; i <= 8; i++)
-        cv::line(img, face.points14[i - 1], face.points14[i], BLUE, width);
 
-    for (int i = 0; i < kFeaturePoints; i++)
-    {
-        if (i <= 8)
-            cv::circle(img, face.points14[i], width, CYAN, -1);
-        else if (i <= 9)
-            cv::circle(img, face.points14[i], width, GREEN, -1);
-        else if (i <= 11)
-            cv::circle(img, face.points14[i], width, PURPLE, -1);
-        else
-            cv::circle(img, face.points14[i], width, RED, -1);
-    }
-    
-}
-
-cv::Mat CropFace(cv::Mat img, Window face, int cropSize)
-{
-    float x1 = face.x;
-    float y1 = face.y;
-    float x2 = face.width + face.x - 1;
-    float y2 = face.width + face.y - 1;
-    float centerX = (x1 + x2) / 2;
-    float centerY = (y1 + y2) / 2;
-    cv::Point2f srcTriangle[3];
-    cv::Point2f dstTriangle[3];
-    srcTriangle[0] = RotatePoint(x1, y1, centerX, centerY, face.angle);
-    srcTriangle[1] = RotatePoint(x1, y2, centerX, centerY, face.angle);
-    srcTriangle[2] = RotatePoint(x2, y2, centerX, centerY, face.angle);
-    dstTriangle[0] = cv::Point(0, 0);
-    dstTriangle[1] = cv::Point(0, cropSize - 1);
-    dstTriangle[2] = cv::Point(cropSize - 1, cropSize - 1);
-    cv::Mat rotMat = cv::getAffineTransform(srcTriangle, dstTriangle);
-    cv::Mat ret;
-    cv::warpAffine(img, ret, rotMat, cv::Size(cropSize, cropSize));
-    return ret;
-}
 
 class PCN
 {
@@ -143,6 +103,11 @@ public:
     void SetTrackingThresh(float thresh);
     std::vector<Window> DetectTrack(cv::Mat img);
     int GetTrackingFrame();
+    static cv::Mat CropFace(cv::Mat img, Window face, int cropSize);
+    static void DrawPoints(cv::Mat img, Window face); 
+    static void DrawFace(cv::Mat img, Window face);
+    static void DrawLine(cv::Mat img, std::vector<cv::Point> pointList);
+    static cv::Point RotatePoint(float x, float y, float centerX, float centerY, float angle);
 private:
     void* impl_;
 };
