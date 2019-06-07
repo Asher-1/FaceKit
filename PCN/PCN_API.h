@@ -70,6 +70,16 @@ extern "C"
 		return api_pcn->wins;
 	}
 
+	void get_aligned_face(unsigned char* input_image, size_t rows, size_t cols, 
+			Window* face, unsigned char* output_image, size_t cropSize)
+	{
+		cv::Mat in_img(rows,cols, CV_8UC3, (void*)input_image);
+		cv::Mat out_img(cropSize,cropSize, CV_8UC3, (void*)output_image);
+		cv::Mat temp_img = PCN::CropFace(in_img, *face, cropSize);
+		temp_img.copyTo(out_img);
+	}
+
+
 	void free_detector(void *pcn)
 	{
 		API_PCN* api_pcn = (API_PCN*) pcn;

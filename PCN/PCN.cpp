@@ -86,6 +86,7 @@ int PCN::GetTrackingFrame()
 }
 
 // Static functions
+//TODO: Corrent bad rotation implementation!!!
 cv::Mat PCN::CropFace(cv::Mat img, Window face, int cropSize)
 {
     float x1 = face.x;

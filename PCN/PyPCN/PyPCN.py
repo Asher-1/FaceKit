@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import sys
 import os
-#from ipdb import set_trace as dbg
 from enum import IntEnum
 
 class Point(Structure):
@@ -71,6 +70,11 @@ detect_and_track_faces = lib.detect_and_track_faces
 detect_and_track_faces.argtypes = [c_void_p, POINTER(c_ubyte),c_size_t,c_size_t,POINTER(c_int)]
 detect_and_track_faces.restype = POINTER(Window)
 
+#void get_aligned_face(unsigned char* input_image, size_t rows, size_t cols, 
+#                Window* face, unsigned char* output_image, size_t cropSize)
+get_aligned_face = lib.get_aligned_face
+get_aligned_face.argtypes = [POINTER(c_ubyte),c_size_t,c_size_t,
+        POINTER(Window),POINTER(c_ubyte),c_size_t]
 
 # void free_detector(void *pcn)
 free_detector = lib.free_detector
@@ -140,6 +144,15 @@ if __name__=="__main__":
         windows = detect_and_track_faces(detector, raw_data, 
                 int(height), int(width),
                 pointer(face_count))
+        if face_count.value > 0:
+            crpSize = 150
+            cropped_face = np.zeros((crpSize,crpSize,3),dtype=np.uint8)
+            raw_crp = cropped_face.ctypes.data_as(POINTER(c_ubyte))
+
+            get_aligned_face(raw_data, int(height), int(width),pointer(windows[0]),
+                    raw_crp,int(crpSize))
+            cv2.imshow('crop', cropped_face)
+
         for i in range(face_count.value):
             DrawFace(windows[i],frame)
             DrawPoints(windows[i],frame)

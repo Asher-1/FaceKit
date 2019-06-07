@@ -1,4 +1,5 @@
 #include "PCN_API.h"
+#define CROPPED_FACE 150
 int main(int argc, char **argv)
 {
 	const char *detection_model_path = "./model/PCN.caffemodel";
@@ -21,6 +22,7 @@ int main(int argc, char **argv)
 		return 0;
 
 	cv::Mat img;
+	cv::Mat crpImg(CROPPED_FACE, CROPPED_FACE, CV_8UC3, cv::Scalar(0,0, 0));
 	cv::TickMeter tm;
 	while (1)
 	{
@@ -39,6 +41,13 @@ int main(int argc, char **argv)
 		ss << std::setw(4) << fps;
 		cv::putText(img, std::string("PCN:") + ss.str() + "FPS",
 				cv::Point(20, 45), 4, 1, cv::Scalar(0, 0, 125));
+
+		if (lwin>0){
+			get_aligned_face(img.data,img.rows,img.cols,
+					&wins[0], crpImg.data,CROPPED_FACE);
+			cv::imshow("Crop", crpImg);
+		}
+
 		for (int i = 0; i < lwin; i++){
 			cv::putText(img, std::string("id:") + std::to_string(wins[i].id),
 					cv::Point(wins[i].x,wins[i].y ), 1, 1, cv::Scalar(255, 0, 0));
