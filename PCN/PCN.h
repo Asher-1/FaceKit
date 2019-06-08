@@ -41,16 +41,22 @@ struct Window
     cv::Point points14[kFeaturePoints];
     float descriptor[kDescriptorLen];
 
-    Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_, long id_, cv::Point p14_[kFeaturePoints])
+    Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_, long id_, 
+		    cv::Point p14_[kFeaturePoints], float desc_[kDescriptorLen])
         : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(id_)
     {
 	    set_points(p14_);
+	    set_desc(desc_);
     }
     
     //New window without points and ID
     Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_)
         : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(-1)
     {}
+
+    void set_desc(float desc_[]) {
+	    memcpy(descriptor,&(desc_[0]),kDescriptorLen*sizeof(float));
+    }
 
     void set_points(cv::Point p14_[]) {
 	    memcpy(points14,&(p14_[0]),kFeaturePoints*sizeof(cv::Point));

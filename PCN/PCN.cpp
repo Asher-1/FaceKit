@@ -682,11 +682,22 @@ std::vector<Window> PCN::Embed_(cv::Mat img,caffe::shared_ptr<caffe::Net<float> 
     net->Forward();
     caffe::Blob<float>* desc = net->output_blobs()[0];
     float *p = desc->mutable_cpu_data();
-    for (int i = 0; i < winList.size(); i++){
-	memcpy(winList[i].descriptor,p,sizeof(float)*kDescriptorLen);
+    std::vector<Window> tmpWinList;
+    for (int i = 0; i < winList.size(); i++)
+    {
+        Window win(winList[i].x, winList[i].y,
+                   winList[i].width, winList[i].height, 
+		   winList[i].angle, winList[i].scale, 
+		   winList[i].conf, winList[i].id, 
+		   winList[i].points14, winList[i].descriptor);
+        tmpWinList.push_back(win);
+    }
+
+    for (int i = 0; i < tmpWinList.size(); i++){
+	memcpy(tmpWinList[i].descriptor,p,sizeof(float)*kDescriptorLen);
         p += kDescriptorLen;
     }
-    return winList;
+    return tmpWinList;
 }
 
 std::vector<Window> PCN::Detect_(cv::Mat img, cv::Mat imgPad)
@@ -726,7 +737,8 @@ std::vector<Window> PCN::Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
                    winList[i].width + 2 * augScale_ * winList[i].width, 
                    winList[i].height + 2 * augScale_ * winList[i].height, 
 		   winList[i].angle, winList[i].scale, 
-		   winList[i].conf, winList[i].id, winList[i].points14);
+		   winList[i].conf, winList[i].id, winList[i].points14,
+		   winList[i].descriptor);
         tmpWinList.push_back(win);
     }
     std::vector<cv::Mat> dataList;
@@ -777,7 +789,7 @@ std::vector<Window> PCN::Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
                     {
                         ret.push_back(Window(x + augScale_ * tmpW,
                                               y + augScale_ * tmpW,
-                                              tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0]));
+                                              tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0], winList[i].descriptor));
                     }
                 }
             }
@@ -786,7 +798,7 @@ std::vector<Window> PCN::Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
                 int tmpW = w / (1 + 2 * augScale_);
                 ret.push_back(Window(x + augScale_ * tmpW,
                                       y + augScale_ * tmpW,
-                                      tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0]));
+                                      tmpW, tmpW, winList[i].angle + angle, winList[i].scale, prob->data_at(i, 1, 0, 0),winList[i].id,&points14[0], winList[i].descriptor));
             }
         }
     }
