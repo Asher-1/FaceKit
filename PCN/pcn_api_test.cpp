@@ -8,10 +8,12 @@ int main(int argc, char **argv)
 	const char *pcn3_proto = "./model/PCN-3.prototxt";
 	const char *tracking_model_path = "./model/PCN-Tracking.caffemodel";
 	const char *tracking_proto = "./model/PCN-Tracking.prototxt";
-
+	const char *embed_model = "./model/resnetInception-128.caffemodel";
+	const char *embed_proto = "model/resnetInception-128.prototxt";
 	PCN* detector = (PCN*) init_detector(detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
-			tracking_model_path,tracking_proto,
-			40,1.45,0.5,0.5,0.98,30,0.9);
+			tracking_model_path,tracking_proto,embed_model, embed_proto,
+			40,1.45,0.5,0.5,0.98,30,0.9,1);
+	
 	cv::VideoCapture capture;
 	if (argc >1)
 		capture.open(argv[1]);
@@ -46,6 +48,7 @@ int main(int argc, char **argv)
 			get_aligned_face(img.data,img.rows,img.cols,
 					&wins[0], crpImg.data,CROPPED_FACE);
 			cv::imshow("Crop", crpImg);
+			printf("embed %f\n",wins[0].descriptor[0]);
 		}
 
 		for (int i = 0; i < lwin; i++){

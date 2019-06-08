@@ -4,8 +4,8 @@ int main()
 {
     PCN detector("model/PCN.caffemodel",
                  "model/PCN-1.prototxt", "model/PCN-2.prototxt", "model/PCN-3.prototxt",
-                 "model/PCN-Tracking.caffemodel",
-                 "model/PCN-Tracking.prototxt");
+                 "model/PCN-Tracking.caffemodel", "model/PCN-Tracking.prototxt",
+		 "model/resnetInception-128.caffemodel","model/resnetInception-128.prototxt");
     /// detection
     detector.SetMinFaceSize(20);
     detector.SetImagePyramidScaleFactor(1.414);

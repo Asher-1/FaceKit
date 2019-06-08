@@ -1,12 +1,33 @@
 #include "PCN.h"
 #include "PCN_API.h"
 
-
 PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
-         std::string modelTrack, std::string netTrack) 
+         std::string modelTrack, std::string netTrack,
+         std::string modelEmbed, std::string netEmbed) 
 {
-    LoadModel_(modelDetect, net1, net2, net3, modelTrack, netTrack);
+    LoadModel_(modelDetect, net1, net2, net3, 
+		    modelTrack, netTrack,modelEmbed,netEmbed);
+    SetDeafultValues_();
+}
+
+void PCN::SetDeafultValues_(){ 
     global_id_ = 0;
+    minFace_ = 40*1.4;
+    classThreshold_[NET_STAGE1] = 0.5;
+    classThreshold_[NET_STAGE2] = 0.5;
+    classThreshold_[NET_STAGE3] = 0.98;
+    nmsThreshold_[NET_STAGE1] = 0.8;
+    nmsThreshold_[NET_STAGE2] = 0.8;
+    nmsThreshold_[NET_STAGE3] = 0.3;
+    stride_ = 8;
+    angleRange_ = 45;
+    augScale_ = 0.15;
+    mean_ = cv::Scalar(104, 117, 123);
+    scale_ = 1.45;
+    period_ = 30;
+    trackPeriod_ = period_;
+    trackThreshold_ = 0.9; 
+    doEmbed_ = 0;
 }
 
 void PCN::SetMinFaceSize(int minFace)
@@ -17,16 +38,9 @@ void PCN::SetMinFaceSize(int minFace)
 
 void PCN::SetDetectionThresh(float thresh1, float thresh2, float thresh3)
 {
-    classThreshold_[0] = thresh1;
-    classThreshold_[1] = thresh2;
-    classThreshold_[2] = thresh3;
-    nmsThreshold_[0] = 0.8;
-    nmsThreshold_[1] = 0.8;
-    nmsThreshold_[2] = 0.3;
-    stride_ = 8;
-    angleRange_ = 45;
-    augScale_ = 0.15;
-    mean_ = cv::Scalar(104, 117, 123);
+    classThreshold_[NET_STAGE1] = thresh1;
+    classThreshold_[NET_STAGE2] = thresh2;
+    classThreshold_[NET_STAGE3] = thresh3;
 }
 
 void PCN::SetImagePyramidScaleFactor(float factor)
@@ -37,7 +51,7 @@ void PCN::SetImagePyramidScaleFactor(float factor)
 void PCN::SetTrackingPeriod(int period)
 {
     period_ = period;
-    detectFlag_ = period;
+    trackPeriod_ = period;
 }
 
 void PCN::SetTrackingThresh(float thres)
@@ -45,21 +59,26 @@ void PCN::SetTrackingThresh(float thres)
     trackThreshold_ = thres;
 }
 
+void PCN::SetEmbedding(int doEmbed){
+	doEmbed_ = doEmbed;
+}
+
 std::vector<Window> PCN::Detect(cv::Mat img)
 {
     cv::Mat imgPad = PadImg_(img);
     std::vector<Window> winList = Detect_(img, imgPad);
-    std::vector<Window> pointsList = Track_(imgPad, net_[3], -1, 96, winList);
+    std::vector<Window> pointsList = Track_(imgPad, net_[NET_TRACK], -1, NET_TRACK_WIN_SIZE, winList);
     for (int i = 0; i < winList.size(); i++)
 	winList[i].set_points(pointsList[i].points14);
-    return TransWindow_(img, imgPad, winList);
+    winList = TransWindow_(img, imgPad, winList);
+    return winList;
 }
 
 std::vector<Window> PCN::DetectTrack(cv::Mat img)
 {
     cv::Mat imgPad = PadImg_(img);
     std::vector<Window> winList = preList_;
-    if (detectFlag_ == period_)
+    if (trackPeriod_ == period_)
     {
         std::vector<Window> tmpList = Detect_(img, imgPad);
 
@@ -68,21 +87,21 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
             winList.push_back(tmpList[i]);
         }
     }
-    winList = NMS_(winList, false, nmsThreshold_[2]);
-    winList = Track_(imgPad, net_[3], trackThreshold_, 96, winList);
-    winList = NMS_(winList, false, nmsThreshold_[2]);
+    winList = NMS_(winList, false, nmsThreshold_[NET_STAGE3]);
+    winList = Track_(imgPad, net_[NET_TRACK], trackThreshold_, NET_TRACK_WIN_SIZE, winList);
+    winList = NMS_(winList, false, nmsThreshold_[NET_STAGE3]);
     winList = DeleteFP_(winList);
     winList = SmoothWindowWithId_(winList);
     preList_ = winList;
-    detectFlag_--;
-    if (detectFlag_ <= 0)
-        detectFlag_ = period_;
+    trackPeriod_--;
+    if (trackPeriod_ <= 0)
+        trackPeriod_ = period_;
     return TransWindow_(img, imgPad, winList);
 }
 
-int PCN::GetTrackingFrame()
+int PCN::GetTrackingPeriod()
 {
-    return detectFlag_;
+    return trackPeriod_;
 }
 
 // Static functions
@@ -169,23 +188,40 @@ void PCN::DrawFace(cv::Mat img, Window face)
 
 
 void PCN::LoadModel_(std::string modelDetect, std::string net1, std::string net2, std::string net3,
-                     std::string modelTrack, std::string netTrack)
+                     std::string modelTrack, std::string netTrack,
+		     std::string modelEmbed, std::string netEmbed)
 {
     caffe::Caffe::set_mode(caffe::Caffe::CPU);
     google::InitGoogleLogging("VR");
     FLAGS_logtostderr = 0;
 
-    net_[0].reset(new caffe::Net<float>(net1.c_str(), caffe::TEST));
-    net_[0]->CopyTrainedLayersFrom(modelDetect.c_str());
-    net_[1].reset(new caffe::Net<float>(net2.c_str(), caffe::TEST));
-    net_[1]->CopyTrainedLayersFrom(modelDetect.c_str());
-    net_[2].reset(new caffe::Net<float>(net3.c_str(), caffe::TEST));
-    net_[2]->CopyTrainedLayersFrom(modelDetect.c_str());
-
-    net_[3].reset(new caffe::Net<float>(netTrack.c_str(), caffe::TEST));
-    net_[3]->CopyTrainedLayersFrom(modelTrack.c_str());
+    net_[NET_STAGE1].reset(new caffe::Net<float>(net1.c_str(), caffe::TEST));
+    net_[NET_STAGE1]->CopyTrainedLayersFrom(modelDetect.c_str());
+    net_[NET_STAGE2].reset(new caffe::Net<float>(net2.c_str(), caffe::TEST));
+    net_[NET_STAGE2]->CopyTrainedLayersFrom(modelDetect.c_str());
+    net_[NET_STAGE3].reset(new caffe::Net<float>(net3.c_str(), caffe::TEST));
+    net_[NET_STAGE3]->CopyTrainedLayersFrom(modelDetect.c_str());
+    net_[NET_TRACK].reset(new caffe::Net<float>(netTrack.c_str(), caffe::TEST));
+    net_[NET_TRACK]->CopyTrainedLayersFrom(modelTrack.c_str());
+    net_[NET_EMBED].reset(new caffe::Net<float>(netEmbed.c_str(), caffe::TEST));
+    net_[NET_EMBED]->CopyTrainedLayersFrom(modelEmbed.c_str());
 
     google::ShutdownGoogleLogging();
+}
+
+cv::Mat PCN::PreWhiten_(cv::Mat img){
+    cv::Scalar mean3,stddev3; 
+    cv::Mat imgF,img_rgb;
+    cv::cvtColor(img,img_rgb, cv::COLOR_BGR2RGB);//must be rgb for embeding
+    img_rgb.convertTo(imgF, CV_32FC3);//must be float
+    cv::meanStdDev(imgF,mean3,stddev3);
+    float m1 = (mean3[0] + mean3[1] + mean3[2])/3;
+    float v2 = (stddev3[0]*stddev3[0]+ stddev3[1]*stddev3[1] +stddev3[2]*stddev3[2]+
+		    mean3[0]*mean3[0] + mean3[1]*mean3[1] + mean3[2]*mean3[2])/3;
+    float one_std = 1.0/(sqrt(v2 - m1*m1) + 1e-4);
+    cv::Scalar mean3_corr(m1,m1,m1);
+    cv::Mat prewhitenedIImg = (imgF - mean3_corr)*one_std;
+    return prewhitenedIImg;
 }
 
 cv::Mat PCN::PreProcessImg_(cv::Mat img)
@@ -359,7 +395,7 @@ std::vector<Window> PCN::Stage1_(cv::Mat img, cv::Mat imgPad, caffe::shared_ptr<
     int row = (imgPad.rows - img.rows) / 2;
     int col = (imgPad.cols - img.cols) / 2;
     std::vector<Window> winList;
-    int netSize = 24;
+    int netSize = NET_STAGE1_WIN_SIZE;
     float curScale;
     curScale = minFace_ / float(netSize);
     cv::Mat imgResized = ResizeImg_(img, curScale);
@@ -568,7 +604,6 @@ std::vector<Window> PCN::TransWindow_(cv::Mat img, cv::Mat imgPad, std::vector<W
     int row = (imgPad.rows - img.rows) / 2;
     int col = (imgPad.cols - img.cols) / 2;
 
-    std::vector<Window> ret;
     for(int i = 0; i < winList.size(); i++)
     {
         if (winList[i].width > 0 && winList[i].height > 0)
@@ -578,19 +613,11 @@ std::vector<Window> PCN::TransWindow_(cv::Mat img, cv::Mat imgPad, std::vector<W
                 winList[i].points14[j].x -= col;
                 winList[i].points14[j].y -= row;
             }
-            ret.push_back(
-			    Window( winList[i].x - col, 
-				    winList[i].y - row, 
-				    winList[i].width, 
-				    winList[i].height, 
-				    winList[i].angle, 
-				    winList[i].scale, 
-				    winList[i].conf, 
-				    winList[i].id,
-				    winList[i].points14));
+	    winList[i].x -= col;
+	    winList[i].y -= row;
         }
     }
-    return ret;
+    return winList;
 }
 
 #define kMinIoU_Tracking 0.1
@@ -630,16 +657,35 @@ std::vector<Window> PCN::SmoothWindowWithId_(std::vector<Window> winList)
 	    winList[i].id = preList_[jmax].id; 
 	   
 	}else{
-	    //detectFlag_ = 0;
+	    //trackPeriod_ = 0;
 	    winList[i].id = global_id_++; 
 	}
     }
 
     //if ((preList_.size() > winList.size()) | 
     //    	    (winList.size()==0))
-    //    detectFlag_ = 0;
+    //    trackPeriod_ = 0;
 
     preList_ = winList;
+    return winList;
+}
+
+std::vector<Window> PCN::Embed_(cv::Mat img,caffe::shared_ptr<caffe::Net<float> > &net, std::vector<Window> &winList,int dim)
+{
+    std::vector<cv::Mat> dataList;
+    if (winList.size()==0)
+	    return winList;
+    for (int i = 0; i < winList.size(); i++)
+        dataList.push_back(PreWhiten_(PCN::CropFace(img, winList[i], dim)));
+
+    SetInput_(dataList, net);
+    net->Forward();
+    caffe::Blob<float>* desc = net->output_blobs()[0];
+    float *p = desc->mutable_cpu_data();
+    for (int i = 0; i < winList.size(); i++){
+	memcpy(winList[i].descriptor,p,sizeof(float)*kDescriptorLen);
+        p += kDescriptorLen;
+    }
     return winList;
 }
 
@@ -650,15 +696,20 @@ std::vector<Window> PCN::Detect_(cv::Mat img, cv::Mat imgPad)
     cv::transpose(imgPad, img90);
     cv::flip(img90, imgNeg90, 0);
 
-    std::vector<Window> winList = Stage1_(img, imgPad, net_[0], classThreshold_[0]);
-    winList = NMS_(winList, true, nmsThreshold_[0]);
+    std::vector<Window> winList = Stage1_(img, imgPad, net_[NET_STAGE1], 
+		    classThreshold_[NET_STAGE1]);
+    winList = NMS_(winList, true, nmsThreshold_[NET_STAGE1]);
 
-    winList = Stage2_(imgPad, img180, net_[1], classThreshold_[1], 24, winList);
-    winList = NMS_(winList, true, nmsThreshold_[1]);
+    winList = Stage2_(imgPad, img180, net_[NET_STAGE2], 
+		    classThreshold_[NET_STAGE2], NET_STAGE2_WIN_SIZE, winList);
+    winList = NMS_(winList, true, nmsThreshold_[NET_STAGE2]);
 
-    winList = Stage3_(imgPad, img180, img90, imgNeg90, net_[2], classThreshold_[2], 48, winList);
-    winList = NMS_(winList, false, nmsThreshold_[2]);
+    winList = Stage3_(imgPad, img180, img90, imgNeg90, net_[NET_STAGE3], 
+		    classThreshold_[NET_STAGE3], NET_STAGE3_WIN_SIZE, winList);
+    winList = NMS_(winList, false, nmsThreshold_[NET_STAGE3]);
     winList = DeleteFP_(winList);
+    if (doEmbed_)
+	    winList = Embed_(imgPad,net_[NET_EMBED],winList,NET_EMBED_WIN_SIZE);
     return winList;
 }
 
@@ -701,7 +752,7 @@ std::vector<Window> PCN::Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float>
             float centerX = (2 * tmpWinList[i].x + tmpWinList[i].width - 1) / 2;
             float centerY = (2 * tmpWinList[i].y + tmpWinList[i].width - 1) / 2;
             std::vector<cv::Point> points14;
-            for (int j = 0; j < pointsReg->shape(1) / 2; j++)
+            for (int j = 0; j < (pointsReg->shape(1)) >> 1; j++)
             {
                 points14.push_back(PCN::RotatePoint((pointsReg->data_at(i, 2 * j, 0, 0) + 0.5) * (cropW - 1) + cropX,
                                                (pointsReg->data_at(i, 2 * j + 1, 0, 0) + 0.5) * (cropW - 1) + cropY,

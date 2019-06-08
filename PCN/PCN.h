@@ -23,6 +23,14 @@
 #define PURPLE CV_RGB(139, 0, 255)
 
 #define kFeaturePoints 14
+#define kDescriptorLen 128
+
+#define NET_STAGE1_WIN_SIZE 24
+#define NET_STAGE2_WIN_SIZE 24
+#define NET_STAGE3_WIN_SIZE 48
+#define NET_TRACK_WIN_SIZE 96
+#define NET_EMBED_WIN_SIZE 160
+
 
 struct Window
 {
@@ -31,6 +39,7 @@ struct Window
     float conf;
     long id;
     cv::Point points14[kFeaturePoints];
+    float descriptor[kDescriptorLen];
 
     Window(int x_, int y_, int w_, int h_, float a_, float s_, float c_, long id_, cv::Point p14_[kFeaturePoints])
         : x(x_), y(y_), width(w_),height(h_), angle(a_), scale(s_), conf(c_), id(id_)
@@ -48,21 +57,33 @@ struct Window
     }
 };
 
+enum {
+	NET_STAGE1=0,
+	NET_STAGE2,
+	NET_STAGE3,
+	NET_TRACK,
+	NET_EMBED
+};
+
 class PCN
 {
 public:
     PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
-        std::string modelTrack, std::string netTrack);
-    /// detection
+	    std::string modelTrack, std::string netTrack,
+	    std::string modelEmbed, std::string netEmbed);
+    /// Get/Set
     void SetMinFaceSize(int minFace);
     void SetDetectionThresh(float thresh1, float thresh2, float thresh3);
     void SetImagePyramidScaleFactor(float factor);
+    void SetEmbedding(int doEmbed);
+    void SetTrackingPeriod(int period);
+    int GetTrackingPeriod();
+    void SetTrackingThresh(float thresh);
+    /// detection
     std::vector<Window> Detect(cv::Mat img);
     /// tracking
-    void SetTrackingPeriod(int period);
-    void SetTrackingThresh(float thresh);
     std::vector<Window> DetectTrack(cv::Mat img);
-    int GetTrackingFrame();
+    /// embedding
     static cv::Mat CropFace(cv::Mat img, Window face, int cropSize);
     static void DrawPoints(cv::Mat img, Window face); 
     static void DrawFace(cv::Mat img, Window face);
@@ -70,7 +91,9 @@ public:
     static cv::Point RotatePoint(float x, float y, float centerX, float centerY, float angle);
 private:
     void LoadModel_(std::string modelDetect, std::string net1, std::string net2, std::string net3,
-                   std::string modelTrack, std::string netTrack);
+		    std::string modelTrack, std::string netTrack,
+		    std::string modelEmbed, std::string netEmbed);
+    void SetDeafultValues_();
     cv::Mat ResizeImg_(cv::Mat img, float scale);
     static bool CompareWin_(const Window &w1, const Window &w2);
     bool Legal_(int x, int y, cv::Mat img);
@@ -80,6 +103,7 @@ private:
     float IoU_(Window &w1, Window &w2);
     std::vector<Window> NMS_(std::vector<Window> &winList, bool local, float threshold);
     std::vector<Window> DeleteFP_(std::vector<Window> &winList);
+    cv::Mat PreWhiten_(cv::Mat img);
     cv::Mat PreProcessImg_(cv::Mat img);
     cv::Mat PreProcessImg_(cv::Mat img,  int dim);
     void SetInput_(cv::Mat input, caffe::shared_ptr<caffe::Net<float> > &net);
@@ -91,12 +115,13 @@ private:
                                 caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
     std::vector<Window> Stage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90,
                                 caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList);
+    std::vector<Window> Embed_(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,std::vector<Window> &winList,int dim);
     std::vector<Window> Detect_(cv::Mat img, cv::Mat imgPad);
     std::vector<Window> Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
                                float thres, int dim, std::vector<Window> &winList);
 
     //private data
-    caffe::shared_ptr<caffe::Net<float> > net_[4];
+    caffe::shared_ptr<caffe::Net<float> > net_[5];
     int minFace_;
     float scale_;
     int stride_;
@@ -107,9 +132,11 @@ private:
     float trackThreshold_;
     float augScale_;
     cv::Scalar mean_;
-    long global_id_; //Global ID incrementor
     std::vector<Window> preList_;
-    int detectFlag_;
+    int trackPeriod_;
+    long global_id_; //Global ID incrementor
+    //Flags
+    int doEmbed_;
 };
 
 #endif
