@@ -44,7 +44,7 @@ extern "C"
 		return static_cast<void*> (api_pcn);
 	}
 	
-	int get_detect_status(void* pcn){
+	int get_track_period(void* pcn){
 		API_PCN* api_pcn = (API_PCN*) pcn;
 		return  api_pcn->detector->GetTrackingPeriod();
 	}

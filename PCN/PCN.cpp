@@ -25,15 +25,14 @@ void PCN::SetDeafultValues_(){
     mean_ = cv::Scalar(104, 117, 123);
     scale_ = 1.45;
     period_ = 30;
-    trackPeriod_ = period_;
+    trackPeriod_ = 0;
     trackThreshold_ = 0.9; 
     doEmbed_ = 0;
 }
 
 void PCN::SetMinFaceSize(int minFace)
 {
-    minFace_ = minFace > 20 ? minFace : 20;
-    minFace_ *= 1.4;
+    minFace_ = minFace * 1.4;
 }
 
 void PCN::SetDetectionThresh(float thresh1, float thresh2, float thresh3)
@@ -51,7 +50,7 @@ void PCN::SetImagePyramidScaleFactor(float factor)
 void PCN::SetTrackingPeriod(int period)
 {
     period_ = period;
-    trackPeriod_ = period;
+    trackPeriod_ = 0;
 }
 
 void PCN::SetTrackingThresh(float thres)
@@ -78,7 +77,7 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
 {
     cv::Mat imgPad = PadImg_(img);
     std::vector<Window> winList = preList_;
-    if (trackPeriod_ == period_)
+    if (trackPeriod_ == 0)
     {
         std::vector<Window> tmpList = Detect_(img, imgPad);
 
@@ -93,8 +92,7 @@ std::vector<Window> PCN::DetectTrack(cv::Mat img)
     winList = DeleteFP_(winList);
     winList = SmoothWindowWithId_(winList);
     preList_ = winList;
-    trackPeriod_--;
-    if (trackPeriod_ <= 0)
+    if (trackPeriod_-- <= 0)
         trackPeriod_ = period_;
     return TransWindow_(img, imgPad, winList);
 }
@@ -105,7 +103,6 @@ int PCN::GetTrackingPeriod()
 }
 
 // Static functions
-//TODO: Corrent bad rotation implementation!!!
 cv::Mat PCN::CropFace(cv::Mat img, Window face, int cropSize)
 {
     float x1 = face.x;

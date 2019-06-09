@@ -48,7 +48,6 @@ int main(int argc, char **argv)
 			get_aligned_face(img.data,img.rows,img.cols,
 					&wins[0], crpImg.data,CROPPED_FACE);
 			cv::imshow("Crop", crpImg);
-			printf("embed %f\n",wins[0].descriptor[0]);
 		}
 
 		for (int i = 0; i < lwin; i++){
