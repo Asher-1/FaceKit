@@ -1,0 +1,98 @@
+from sklearn import svm
+import pickle
+from random import choice, sample,choices
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import SGDClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC,SVR
+from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.gaussian_process.kernels import RBF
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+
+class Correlation():
+    def __init__(self):
+        self.th = 0.5
+        pass
+    def predict_proba(self,x):
+        x = np.array(x)
+        vec_len = x.shape[1]
+        left,right = np.array_split(x,2,axis=1)
+        proba = []
+        for l,r in zip(left,right):
+            proba.append(np.corrcoef(l,r)[0,1])
+        proba = np.array(proba)
+        proba = np.vstack((1-proba,proba))
+        return proba.T
+
+    def predict(self,x):
+        proba = self.predict_proba(x)[:,1]
+        y = np.zeros(len(proba))
+        y[proba > self.th] = 1
+        return y
+    def fit(self,x,y):
+        pass
+    def score(self,x,y):
+        pass
+
+
+classifiers = {
+        "MLPClassifier":MLPClassifier(alpha=1e-3,tol=1e-3, max_iter=1000,hidden_layer_sizes=(128,64)),
+        #"SVC_RBF":SVC(gamma=2, C=1,probability=True),
+        #"Correlation":Correlation(),
+        #"SVC_RBF_Test":SVC(gamma=3, C=1,probability=True),
+        #"KNeighborsClassifier":KNeighborsClassifier(3),
+        #"SVC_Linear":SVC(kernel="linear", C=0.025,probability=True),
+        #"GaussianProcessClassifier":GaussianProcessClassifier(1.0 * RBF(1.0)),
+        #"DecisionTreeClassifier":DecisionTreeClassifier(max_depth=5),
+        #"RandomForestClassifier":RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
+        #"AdaBoostClassifier":AdaBoostClassifier(),
+        #"GaussianNB":GaussianNB(),
+        "QuadraticDiscriminantAnalysis":QuadraticDiscriminantAnalysis(),
+        }
+
+with open("persons_dict.pb", 'rb') as f:
+    persons_dict =  pickle.load(f)
+
+Nsim  =  50000
+Ndiff =  50000
+## Similars
+sims_dict = {k:v for k,v in persons_dict.items() if len(v)>1}
+sims = [np.concatenate(sample(v,2)) for v in choices(list(sims_dict.values()),k=Nsim) if len(v) > 1]
+
+#Different
+diff = []
+diff_dict = {k:v for k,v in persons_dict.items() if len(v)>0}
+for _ in range(Ndiff):
+    keys = sample(list(diff_dict.keys()),2)
+    diff.append(np.concatenate([choice(diff_dict[keys[0]]),choice(diff_dict[keys[1]])]))
+
+X = sims+diff
+y = [1]*Nsim + [0]*Ndiff
+X_train, X_test, y_train, y_test = \
+    train_test_split(X, y, test_size=.4, random_state=42)
+for name, clf in classifiers.items():
+    clf.fit(X_train, y_train)
+    score = clf.score(X_test, y_test)
+    probs = clf.predict_proba(X_test)[:,1]
+    preds = clf.predict(X_test)
+    plt.figure()
+    bins = np.arange(-0.02,1.02,0.02)
+    plt.subplot(211)
+    h0,_,_ = plt.hist(probs[np.array(y_test)==0],bins, alpha=0.5, label='0')
+    h1,_,_ = plt.hist(probs[np.array(y_test)==1],bins, alpha=0.5, label='1')
+    plt.title(name)
+    plt.subplot(212)
+    cum_err = np.sum(h0)-np.cumsum(h0) + np.cumsum(h1)
+    min_th = np.argmin(cum_err)
+    plt.semilogy(bins[1:],cum_err)
+    print("{0},score={1:0.4f},threshold={2:0.3f},optimal_rate={3:0.4f}".format(name,score,bins[min_th+1],1-cum_err[min_th]/len(y_test)))
+    with open("./model/trained_{0}_model.clf".format(name), 'wb') as f:
+        pickle.dump(clf, f)
+plt.show()
