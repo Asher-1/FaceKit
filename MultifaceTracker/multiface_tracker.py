@@ -125,17 +125,17 @@ if __name__=="__main__":
 
     mface = MultifaceTracker(
             classifier_path,
-            0.8,0.01,0.02,
+            0.95,0.05,0.01,
             detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
-            40,1.45,0.5,0.5,0.98,30,0.9,1)
+            20,1.45,0.5,0.5,0.98,30,0.6,1)
 
     if os.path.isfile("./tracking.json"):
         mface.ids_manager.preload_ids("./tracking.json")
 
-    cap = cv2.VideoCapture(0)
-    #cap = cv2.VideoCapture("steve.mp4")
+    #cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("office.mp4")
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -143,7 +143,7 @@ if __name__=="__main__":
     writer = cv2.VideoWriter("tracked.mp4", fourcc, fps,(width,height),True)
     while cap.isOpened():
         ret, img = cap.read()
-        if img.shape[0] == 0:
+        if img is None or img.shape[0] == 0:
             break
         for face in mface.track_image(img):
             name = mface.ids_manager.check_match(face.id)
