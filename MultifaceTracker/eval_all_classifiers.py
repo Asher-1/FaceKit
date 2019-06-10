@@ -77,6 +77,13 @@ X = sims+diff
 y = [1]*Nsim + [0]*Ndiff
 X_train, X_test, y_train, y_test = \
     train_test_split(X, y, test_size=.4, random_state=42)
+
+# impose symmetry
+X_train += [np.fft.fftshift(desc) for desc in X_train]
+y_train += y_train
+
+X_test2 = [np.fft.fftshift(desc) for desc in X_test]
+
 for name, clf in classifiers.items():
     clf.fit(X_train, y_train)
     score = clf.score(X_test, y_test)
@@ -84,14 +91,19 @@ for name, clf in classifiers.items():
     preds = clf.predict(X_test)
     plt.figure()
     bins = np.arange(-0.02,1.02,0.02)
-    plt.subplot(211)
+    plt.subplot(311)
     h0,_,_ = plt.hist(probs[np.array(y_test)==0],bins, alpha=0.5, label='0')
     h1,_,_ = plt.hist(probs[np.array(y_test)==1],bins, alpha=0.5, label='1')
     plt.title(name)
-    plt.subplot(212)
+    plt.subplot(312)
     cum_err = np.sum(h0)-np.cumsum(h0) + np.cumsum(h1)
     min_th = np.argmin(cum_err)
     plt.semilogy(bins[1:],cum_err)
+    
+    plt.subplot(313)
+    probs2 = clf.predict_proba(X_test2)[:,1]
+    plt.hist(probs2-probs,bins=100)#,cumulative=True,density=True, histtype='step')
+
     print("{0},score={1:0.4f},threshold={2:0.3f},optimal_rate={3:0.4f}".format(name,score,bins[min_th+1],1-cum_err[min_th]/len(y_test)))
     with open("./model/trained_{0}_model.clf".format(name), 'wb') as f:
         pickle.dump(clf, f)
