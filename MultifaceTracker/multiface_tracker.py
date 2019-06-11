@@ -73,22 +73,22 @@ class IDMatchingManager():
         key_pairs_for_merge = []
         for r,c in zip(row_ind,col_ind):
             if corr_mtx[r,c] > 0.0: #Make sure there is a decision
-                if corr_mtx[r,c] < self.th_non_similar: ## High chances of new face or new description of same face
-                    if new_keys[c] in self.reverse_matched_id:
-                        self.prev_ids[self.reverse_matched_id[new_keys[c]]].append(new_desc[c]) #found a new desc of the face
-                        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]] #maintain reverse matching
-                    else: ## A totally new face
-                        assigned_key = names.get_full_name()
-                        self.prev_ids[assigned_key] = deque([new_desc[c]],self.max_desc_len)
-                        reverse_matched_id[new_keys[c]] = assigned_key
-
-                elif corr_mtx[r,c] > self.th_similar: 
+                if corr_mtx[r,c] > self.th_similar: 
                     ## In case of duplication we want to merge history
                     if new_keys[c] in self.reverse_matched_id and \
                             prev_keys[r] != self.reverse_matched_id[new_keys[c]]: 
                         key_pairs_for_merge.append((prev_keys[r],self.reverse_matched_id[new_keys[c]]))
                         print ("merge",prev_keys[r],self.reverse_matched_id[new_keys[c]])
                     reverse_matched_id[new_keys[c]] = prev_keys[r]
+                #elif corr_mtx[r,c] <= self.th_non_similar: ## High chances of new face or new description of same face
+                #    if new_keys[c] in self.reverse_matched_id:
+                #        self.prev_ids[self.reverse_matched_id[new_keys[c]]].append(new_desc[c]) #found a new desc of the face
+                #        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]] #maintain reverse matching
+                #    else: ## A totally new face
+                #        assigned_key = names.get_full_name()
+                #        self.prev_ids[assigned_key] = deque([new_desc[c]],self.max_desc_len)
+                #        reverse_matched_id[new_keys[c]] = assigned_key
+
                 else:
                     undecided.append((r,c))
             else:
@@ -96,9 +96,10 @@ class IDMatchingManager():
                 undecided.append((r,c))
   
         ## Go through undcided and take previos match if existed
-        for (r,c) in undecided:
-            if new_keys[c] in self.reverse_matched_id:
-                reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]]
+        #for (r,c) in undecided:
+        #    print("Previous assign")
+        #    if new_keys[c] in self.reverse_matched_id:
+        #        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]]
 
         ## Assign new faces since there are mote face than db
         new_idx = np.delete(np.arange(0,len(new_keys),1),col_ind)
@@ -157,17 +158,17 @@ if __name__=="__main__":
 
     mface = MultifaceTracker(
             classifier_path,
-            0.15,0.15,0.02,5,
+            0.9,1e-6,0.02,1,
             detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
-            15,1.45,0.5,0.5,0.98,30,0.9,1)
+            40,1.45,0.5,0.5,0.98,30,0.9,1)
+    frame_count = 0
+    #if os.path.isfile("./tracking.json"):
+    #    mface.ids_manager.preload_ids("./tracking.json")
 
-    if os.path.isfile("./tracking.json"):
-        mface.ids_manager.preload_ids("./tracking.json")
-
-    #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("office.mp4")
+    cap = cv2.VideoCapture(0)
+    #cap = cv2.VideoCapture("office.mp4")
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -175,6 +176,7 @@ if __name__=="__main__":
     writer = cv2.VideoWriter("tracked.mp4", fourcc, fps,(width,height),True)
     while cap.isOpened():
         ret, img = cap.read()
+        frame_count +=1
         if img is None or img.shape[0] == 0:
             break
         for face in mface.track_image(img):
@@ -183,7 +185,9 @@ if __name__=="__main__":
                 name = "Undecided"
             PCN.DrawFace(face,img,name)
 
+        cv2.putText(img,str(frame_count),(10,80), cv2.FONT_HERSHEY_SIMPLEX, 3,(0,255,0),3,cv2.LINE_AA)
         cv2.imshow('window', img)
+        mface.pcn_detector.CheckTrackingPeriod()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         writer.write(img)
