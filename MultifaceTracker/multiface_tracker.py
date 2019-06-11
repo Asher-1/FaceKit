@@ -90,6 +90,7 @@ class IDMatchingManager():
                 #        reverse_matched_id[new_keys[c]] = assigned_key
 
                 else:
+                    print("Undecided {0:.2f}".format(corr_mtx[r,c]))
                     undecided.append((r,c))
             else:
                 print("Bad symmetry")
@@ -102,8 +103,9 @@ class IDMatchingManager():
         #        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]]
 
         ## Assign new faces since there are mote face than db
-        new_idx = np.delete(np.arange(0,len(new_keys),1),col_ind)
-        for c in new_idx:
+        unassigned = np.delete(np.arange(0,len(new_keys),1),col_ind).tolist()
+        undecided_c = [u[1] for u in undecided]
+        for c in unassigned + undecided_c:
             if new_keys[c] in self.reverse_matched_id:
                 self.prev_ids[self.reverse_matched_id[new_keys[c]]].append(new_desc[c]) #found a new desc of the face
                 reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]] #maintain reverse matching
@@ -158,7 +160,7 @@ if __name__=="__main__":
 
     mface = MultifaceTracker(
             classifier_path,
-            0.9,1e-6,0.02,1,
+            0.7,1e-6,0.02,1,
             detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
@@ -167,7 +169,8 @@ if __name__=="__main__":
     #if os.path.isfile("./tracking.json"):
     #    mface.ids_manager.preload_ids("./tracking.json")
 
-    cap = cv2.VideoCapture(0)
+    #cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("steve.mp4")
     #cap = cv2.VideoCapture("office.mp4")
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
