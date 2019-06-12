@@ -1,32 +1,35 @@
 import os
 import numpy as np
 import cv2
-#import names
+import names
 import json
 import pickle
 from scipy.optimize import linear_sum_assignment
 from PyPCN import *
 from collections import deque
+from bidict import bidict
+import sys
 from ipdb import set_trace as dbg
 
-class names():
-    ID=0
-    def __init__():
-        pass
-    @staticmethod
-    def get_full_name():
-        names.ID +=1
-        return names.ID
+#class names():
+#    ID=0
+#    def __init__():
+#        pass
+#    @staticmethod
+#    def get_full_name():
+#        names.ID +=1
+#        return names.ID
 
 
 class IDMatchingManager():
-    def __init__(self,classifier_path,th_similar,th_non_similar,th_symmetry,max_desc_len):
-        self.prev_ids = {} 
-        self.reverse_matched_id = {}
+    def __init__(self,classifier_path,th_similar,th_symmetry,max_desc_len):
+        self.history_ids = {}
+        self.first_appearance = {}
+        self.revese_matches = bidict()
         self.th_similar = th_similar
-        self.th_non_similar = th_non_similar
         self.th_symmetry = th_symmetry
         self.max_desc_len = max_desc_len
+        self.cycle_counter = 0
 
         with open(classifier_path, 'rb') as fd:
             self.classifier_MLP = pickle.load(fd)
@@ -39,91 +42,106 @@ class IDMatchingManager():
                 match_prob1 = self.classifier_MLP.predict_proba([test_vec])[:,1]
                 match_prob2 = self.classifier_MLP.predict_proba([np.fft.fftshift(test_vec)])[:,1]
                 if np.abs(match_prob1-match_prob2) > th_sym:
-                    new_match = -1.0 ## No decision
-                new_match = (match_prob1+match_prob2)*0.5
-                best_match = new_match if new_match>best_match else best_match
+                    tracked_match = -1.0 ## No decision
+                tracked_match = (match_prob1+match_prob2)*0.5
+                best_match = tracked_match if tracked_match>best_match else best_match
         return best_match
 
     def preload_ids(self,json_file):
         with open(json_file, 'r') as fp:
-            self.prev_ids = json.load(fp)
+            self.history_ids = json.load(fp)
         
     def save_ids(self,json_file):
-        temp_ids = {k:list(v) for k,v in self.prev_ids.items()}
+        temp_ids = {k:list(v) for k,v in self.history_ids.items()}
         with open(json_file, 'w') as fp:
             json.dump(temp_ids,fp,indent = 4)
 
-    def update_matches(self,new_ids):
-        prev_keys = list(self.prev_ids.keys())
-        prev_desc = list(self.prev_ids.values())
+    def update_matches(self,tracked_ids):
+        hist_keys = list(self.history_ids.keys())
+        hist_desc = list(self.history_ids.values())
 
-        new_keys = list(new_ids.keys())
-        new_desc = list(new_ids.values())
+        tracked_keys = list(tracked_ids.keys())
+        tracked_desc = list(tracked_ids.values())
 
-        corr_mtx = np.zeros((len(prev_keys),len(new_keys)))
-        for idx_prev, desc_prev in enumerate(prev_desc):
-            for idx_new,desc_new in enumerate(new_desc):
-                match_prob = self.compare_descriptors(desc_prev,[desc_new],self.th_symmetry)
-                corr_mtx[idx_prev,idx_new] = match_prob
+        corr_mtx = np.zeros((len(hist_keys),len(tracked_keys)))
+        for idx_hist, desc_hist in enumerate(hist_desc):
+            for idx_tracked,desc_tracked in enumerate(tracked_desc):
+                match_prob = self.compare_descriptors(desc_hist,[desc_tracked],self.th_symmetry)
+                corr_mtx[idx_hist,idx_tracked] = match_prob
         row_ind, col_ind = linear_sum_assignment(-corr_mtx)
        
-        # Generate new faces
-        reverse_matched_id = {}
+        # Generate tracked faces
+        revese_matches = bidict()
         undecided = []
         key_pairs_for_merge = []
         for r,c in zip(row_ind,col_ind):
-            if corr_mtx[r,c] > 0.0: #Make sure there is a decision
-                if corr_mtx[r,c] > self.th_similar: 
-                    ## In case of duplication we want to merge history
-                    if new_keys[c] in self.reverse_matched_id and \
-                            prev_keys[r] != self.reverse_matched_id[new_keys[c]]: 
-                        key_pairs_for_merge.append((prev_keys[r],self.reverse_matched_id[new_keys[c]]))
-                        print ("merge",prev_keys[r],self.reverse_matched_id[new_keys[c]])
-                    reverse_matched_id[new_keys[c]] = prev_keys[r]
-                #elif corr_mtx[r,c] <= self.th_non_similar: ## High chances of new face or new description of same face
-                #    if new_keys[c] in self.reverse_matched_id:
-                #        self.prev_ids[self.reverse_matched_id[new_keys[c]]].append(new_desc[c]) #found a new desc of the face
-                #        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]] #maintain reverse matching
-                #    else: ## A totally new face
-                #        assigned_key = names.get_full_name()
-                #        self.prev_ids[assigned_key] = deque([new_desc[c]],self.max_desc_len)
-                #        reverse_matched_id[new_keys[c]] = assigned_key
-
-                else:
-                    print("Undecided {0:.2f}".format(corr_mtx[r,c]))
-                    undecided.append((r,c))
+            if corr_mtx[r,c] > self.th_similar: 
+                ## In case of duplication we want to merge history
+                if tracked_keys[c] in self.revese_matches and \
+                        hist_keys[r] != self.revese_matches[tracked_keys[c]]: 
+                    key_pairs_for_merge.append((hist_keys[r],self.revese_matches[tracked_keys[c]]))
+                revese_matches[tracked_keys[c]] = hist_keys[r]
             else:
-                print("Bad symmetry")
+                print("Undecided {0:.2f}".format(corr_mtx[r,c]))
                 undecided.append((r,c))
-  
-        ## Go through undcided and take previos match if existed
-        #for (r,c) in undecided:
-        #    print("Previous assign")
-        #    if new_keys[c] in self.reverse_matched_id:
-        #        reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]]
 
-        ## Assign new faces since there are mote face than db
-        unassigned = np.delete(np.arange(0,len(new_keys),1),col_ind).tolist()
+        ## Assign tracked faces since there are mote face than db
+        unassigned = np.delete(np.arange(0,len(tracked_keys),1),col_ind).tolist()
         undecided_c = [u[1] for u in undecided]
+
         for c in unassigned + undecided_c:
-            if new_keys[c] in self.reverse_matched_id:
-                self.prev_ids[self.reverse_matched_id[new_keys[c]]].append(new_desc[c]) #found a new desc of the face
-                reverse_matched_id[new_keys[c]] = self.reverse_matched_id[new_keys[c]] #maintain reverse matching
+            if tracked_keys[c] in self.revese_matches: ##TODO:consider hgistory
+                ##TODO: What happens if the hist is already assigned!!?
+                self.history_ids[self.revese_matches[tracked_keys[c]]].append(tracked_desc[c]) #found a tracked desc of the face
+                revese_matches[tracked_keys[c]] = self.revese_matches[tracked_keys[c]] #maintain reverse matching
             else: ## A totally new face
                 assigned_key = names.get_full_name()
-                self.prev_ids[assigned_key] = deque([new_desc[c]],self.max_desc_len)
-                reverse_matched_id[new_keys[c]] = assigned_key
+                self.history_ids[assigned_key] = deque([tracked_desc[c]],self.max_desc_len)
+                revese_matches[tracked_keys[c]] = assigned_key
 
-        self.reverse_matched_id = reverse_matched_id
+        ## Perform merges 
+        for a_key,b_key in key_pairs_for_merge:
+            if self._get_first_appearance(a_key) < self._get_first_appearance(b_key):
+               base_key,other_key = a_key, b_key
+            else:
+               base_key,other_key = b_key, a_key
+            print("merging {0} -> {1}".format(other_key,base_key))
+
+            if other_key in revese_matches.inverse:
+                if base_key in revese_matches.inverse:
+                    print("Bad merge:Two images matched to same merge!!!")
+                    continue ## Can't do merge in this situation
+                else:
+                    tracked_key = revese_matches.inverse[other_key]
+                    revese_matches[tracked_key] = base_key
+
+            ## Remove key from history
+            other_desc = self.history_ids.pop(other_key)
+            self.history_ids[base_key].extend(other_desc)
+
+        self.revese_matches = revese_matches
+        self._update_history_counter()
+                   
+    def _update_history_counter(self):
+        for k in self.revese_matches.inverse:
+            if k not in self.first_appearance:
+                self.first_appearance[k] = self.cycle_counter
+        self.cycle_counter += 1
+
+    def _get_first_appearance(self,k):
+            if k not in self.first_appearance:
+                return sys.maxint
+            return self.first_appearance[k]
+
 
     def check_match(self,id_check):
-        if id_check in self.reverse_matched_id:
-            return self.reverse_matched_id[id_check]
+        if id_check in self.revese_matches:
+            return self.revese_matches[id_check]
 
 
 class MultifaceTracker():
-    def __init__(self,classifier_path,th_similar,th_non_similar,th_symmetry,max_desc_len,*args):
-        self.ids_manager = IDMatchingManager(classifier_path,th_similar,th_non_similar,th_symmetry,max_desc_len)
+    def __init__(self,classifier_path,th_similar,th_symmetry,max_desc_len,*args):
+        self.ids_manager = IDMatchingManager(classifier_path,th_similar,th_symmetry,max_desc_len)
         self.pcn_detector = PCN(*args)
 
 
@@ -136,8 +154,8 @@ class MultifaceTracker():
         pcn_faces = self.pcn_detector.DetectAndTrack(img)
 
         if self.pcn_detector.CheckTrackingPeriod()==self.pcn_detector.track_period:
-            new_ids = {pcn_det.id:self._normalize_desc(pcn_det.descriptor) for pcn_det in pcn_faces}
-            self.ids_manager.update_matches(new_ids)
+            tracked_ids = {pcn_det.id:self._normalize_desc(pcn_det.descriptor) for pcn_det in pcn_faces}
+            self.ids_manager.update_matches(tracked_ids)
 
         return pcn_faces
 
@@ -160,7 +178,7 @@ if __name__=="__main__":
 
     mface = MultifaceTracker(
             classifier_path,
-            0.7,1e-6,0.02,1,
+            0.7,0.02,50,
             detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
@@ -169,12 +187,11 @@ if __name__=="__main__":
     #if os.path.isfile("./tracking.json"):
     #    mface.ids_manager.preload_ids("./tracking.json")
 
-    #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("steve.mp4")
-    #cap = cv2.VideoCapture("office.mp4")
+    cap = cv2.VideoCapture(0)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print (width,height)
     fps = cap.get(cv2.CAP_PROP_FPS) # float
     writer = cv2.VideoWriter("tracked.mp4", fourcc, fps,(width,height),True)
     while cap.isOpened():
@@ -182,6 +199,7 @@ if __name__=="__main__":
         frame_count +=1
         if img is None or img.shape[0] == 0:
             break
+        writer.write(img)
         for face in mface.track_image(img):
             name = mface.ids_manager.check_match(face.id)
             if name is None:
@@ -193,7 +211,6 @@ if __name__=="__main__":
         mface.pcn_detector.CheckTrackingPeriod()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        writer.write(img)
     mface.ids_manager.save_ids("tracking.json")
     cap.release()
     writer.release()

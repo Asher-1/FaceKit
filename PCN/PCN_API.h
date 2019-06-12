@@ -3,6 +3,7 @@
 #include "PCN.h"
 
 #define kFeaturePoints 14
+//TODO: prioritize faces between stages if more than X faces
 #define kMaxFaces 64
 
 struct API_PCN{
