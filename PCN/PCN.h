@@ -22,7 +22,7 @@
 #define RED CV_RGB(255, 0, 0)
 #define PURPLE CV_RGB(139, 0, 255)
 
-#define kFeaturePoints 14
+//#define kFeaturePoints 14
 #define kDescriptorLen 128
 
 #define NET_STAGE1_WIN_SIZE 24
@@ -31,11 +31,30 @@
 #define NET_TRACK_WIN_SIZE 96
 #define NET_EMBED_WIN_SIZE 160
 
+enum{
+    FEAT_CHIN_0 = 0,
+    FEAT_CHIN_1,
+    FEAT_CHIN_2,
+    FEAT_CHIN_3,
+    FEAT_CHIN_4,
+    FEAT_CHIN_5,
+    FEAT_CHIN_6,
+    FEAT_CHIN_7,
+    FEAT_CHIN_8,
+    FEAT_NOSE,
+    FEAT_EYE_LEFT,
+    FEAT_EYE_RIGHT,
+    FEAT_MOUTH_LEFT,
+    FEAT_MOUTH_RIGHT,
+    kFeaturePoints
+};
 
 struct Window
 {
     int x, y, width,height;
-    float angle, scale;
+    float angle;
+    float yaw; 
+    float scale;
     float conf;
     long id;
     cv::Point points14[kFeaturePoints];
@@ -56,10 +75,22 @@ struct Window
 
     void set_desc(float desc_[]) {
 	    memcpy(descriptor,&(desc_[0]),kDescriptorLen*sizeof(float));
+	    
+    }
+	
+    void calculate_yaw_angle()
+    {
+	cv::Point vec1 = points14[FEAT_EYE_LEFT] - points14[FEAT_MOUTH_RIGHT];
+	cv::Point vec2 = points14[FEAT_EYE_RIGHT] - points14[FEAT_MOUTH_LEFT];
+	double ab = vec1.dot(vec2);
+	double aa = vec1.dot(vec1);
+	double bb = vec2.dot(vec2);
+	yaw =  ab / sqrt(aa*bb);
     }
 
     void set_points(cv::Point p14_[]) {
 	    memcpy(points14,&(p14_[0]),kFeaturePoints*sizeof(cv::Point));
+	    calculate_yaw_angle();
     }
 };
 

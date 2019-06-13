@@ -19,6 +19,7 @@ class Window(Structure):
                 ("width", c_int),
                 ("height", c_int),
                 ("angle", c_float),
+                ("yaw", c_float),
                 ("scale", c_float),
                 ("conf", c_float),
                 ("id", c_long),
@@ -145,16 +146,16 @@ class PCN():
             face_id = str(win.id)
         cv2.putText(img,"{0}:{1}".format(face_id,win.id),(x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,255,255),1,cv2.LINE_AA)
 
-    @staticmethod
-    def CalculateFaceYaw(win):
-        vec1 =np.array((
-            win.points[FeatEnam.EYE_LEFT].x-win.points[FeatEnam.MOUTH_RIGHT].x,
-            win.points[FeatEnam.EYE_LEFT].y-win.points[FeatEnam.MOUTH_RIGHT].y))
-        vec2 =np.array(( 
-            win.points[FeatEnam.EYE_RIGHT].x-win.points[FeatEnam.MOUTH_LEFT].x,
-            win.points[FeatEnam.EYE_RIGHT].y-win.points[FeatEnam.MOUTH_LEFT].y))
-        cos_angle = np.dot(vec1,vec2)/np.linalg.norm(vec1)/np.linalg.norm(vec2)
-        return cos_angle
+    #@staticmethod
+    #def CalculateFaceYaw(win):
+    #    vec1 =np.array((
+    #        win.points[FeatEnam.EYE_LEFT].x-win.points[FeatEnam.MOUTH_RIGHT].x,
+    #        win.points[FeatEnam.EYE_LEFT].y-win.points[FeatEnam.MOUTH_RIGHT].y))
+    #    vec2 =np.array(( 
+    #        win.points[FeatEnam.EYE_RIGHT].x-win.points[FeatEnam.MOUTH_LEFT].x,
+    #        win.points[FeatEnam.EYE_RIGHT].y-win.points[FeatEnam.MOUTH_LEFT].y))
+    #    cos_angle = np.dot(vec1,vec2)/np.linalg.norm(vec1)/np.linalg.norm(vec2)
+    #    return cos_angle
 
     @staticmethod
     def DrawPoints(win,img):
