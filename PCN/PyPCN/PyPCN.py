@@ -143,7 +143,18 @@ class PCN():
         cv2.polylines(img,[pts],True,(0,0,255))
         if face_id is None:
             face_id = str(win.id)
-        cv2.putText(img,"{0}".format(face_id),(x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,255,255),1,cv2.LINE_AA)
+        cv2.putText(img,"{0}:{1}".format(face_id,win.id),(x1,y1), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,255,255),1,cv2.LINE_AA)
+
+    @staticmethod
+    def CalculateFaceYaw(win):
+        vec1 =np.array((
+            win.points[FeatEnam.EYE_LEFT].x-win.points[FeatEnam.MOUTH_RIGHT].x,
+            win.points[FeatEnam.EYE_LEFT].y-win.points[FeatEnam.MOUTH_RIGHT].y))
+        vec2 =np.array(( 
+            win.points[FeatEnam.EYE_RIGHT].x-win.points[FeatEnam.MOUTH_LEFT].x,
+            win.points[FeatEnam.EYE_RIGHT].y-win.points[FeatEnam.MOUTH_LEFT].y))
+        cos_angle = np.dot(vec1,vec2)/np.linalg.norm(vec1)/np.linalg.norm(vec2)
+        return cos_angle
 
     @staticmethod
     def DrawPoints(win,img):
@@ -199,6 +210,7 @@ if __name__=="__main__":
         for win in windows:
             PCN.DrawFace(win,frame)
             PCN.DrawPoints(win,frame)
+            print(PCN.CalculateFaceYaw(win))
         cv2.imshow('window', frame)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break

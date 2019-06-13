@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import cv2
-import names
 import json
 import pickle
 from scipy.optimize import linear_sum_assignment
@@ -11,15 +10,23 @@ from bidict import bidict
 import sys
 from ipdb import set_trace as dbg
 
-#class names():
-#    ID=0
-#    def __init__():
-#        pass
-#    @staticmethod
-#    def get_full_name():
-#        names.ID +=1
-#        return names.ID
+def debug_msg(string):
+    print(string)
 
+
+class NameGenerator():
+    def __init__(self,filename):
+        self.names_db = []
+        self.ID=0
+        with open(filename) as name_file:
+            for line in name_file:
+                name, _, cummulative, _ = line.split()
+                self.names_db.append(name)
+        pass
+    def get_full_name(self):
+        current_name = self.names_db[self.ID]
+        self.ID = 0 if self.ID >= len(self.names_db) else self.ID + 1
+        return current_name
 
 class IDMatchingManager():
     def __init__(self,classifier_path,th_similar,th_symmetry,max_desc_len):
@@ -30,6 +37,7 @@ class IDMatchingManager():
         self.th_symmetry = th_symmetry
         self.max_desc_len = max_desc_len
         self.cycle_counter = 0
+        self.name_gen = NameGenerator("./dist.male.first")
 
         with open(classifier_path, 'rb') as fd:
             self.classifier_MLP = pickle.load(fd)
@@ -57,6 +65,7 @@ class IDMatchingManager():
             json.dump(temp_ids,fp,indent = 4)
 
     def update_matches(self,tracked_ids):
+
         hist_keys = list(self.history_ids.keys())
         hist_desc = list(self.history_ids.values())
 
@@ -69,6 +78,12 @@ class IDMatchingManager():
                 match_prob = self.compare_descriptors(desc_hist,[desc_tracked],self.th_symmetry)
                 corr_mtx[idx_hist,idx_tracked] = match_prob
         row_ind, col_ind = linear_sum_assignment(-corr_mtx)
+
+        if self.cycle_counter == 29:
+            disc1 = self.history_ids["JAMES"]
+            disc2 = self.history_ids["MICHAEL"]
+            test_match = self.compare_descriptors(disc1,disc2,0.02)
+            dbg()
        
         # Generate tracked faces
         revese_matches = bidict()
@@ -82,10 +97,11 @@ class IDMatchingManager():
                     key_pairs_for_merge.append((hist_keys[r],self.revese_matches[tracked_keys[c]]))
                 revese_matches[tracked_keys[c]] = hist_keys[r]
             else:
-                print("Undecided {0:.2f}".format(corr_mtx[r,c]))
+                debug_msg("{0}: Undecided {1:.2f}".format(self.cycle_counter,corr_mtx[r,c]))
                 undecided.append((r,c))
 
         ## Assign tracked faces since there are mote face than db
+        ##TODO: Make sure unassigned are actually new numbers!!
         unassigned = np.delete(np.arange(0,len(tracked_keys),1),col_ind).tolist()
         undecided_c = [u[1] for u in undecided]
 
@@ -95,7 +111,7 @@ class IDMatchingManager():
                 self.history_ids[self.revese_matches[tracked_keys[c]]].append(tracked_desc[c]) #found a tracked desc of the face
                 revese_matches[tracked_keys[c]] = self.revese_matches[tracked_keys[c]] #maintain reverse matching
             else: ## A totally new face
-                assigned_key = names.get_full_name()
+                assigned_key = self.name_gen.get_full_name()
                 self.history_ids[assigned_key] = deque([tracked_desc[c]],self.max_desc_len)
                 revese_matches[tracked_keys[c]] = assigned_key
 
@@ -105,11 +121,11 @@ class IDMatchingManager():
                base_key,other_key = a_key, b_key
             else:
                base_key,other_key = b_key, a_key
-            print("merging {0} -> {1}".format(other_key,base_key))
+            debug_msg("{0}: Merging {1} -> {2}".format(self.cycle_counter,other_key,base_key))
 
             if other_key in revese_matches.inverse:
                 if base_key in revese_matches.inverse:
-                    print("Bad merge:Two images matched to same merge!!!")
+                    debug_msg("{0}: Bad merge:Two images matched to same merge!!!".format(self.cycle_counter))
                     continue ## Can't do merge in this situation
                 else:
                     tracked_key = revese_matches.inverse[other_key]
@@ -183,11 +199,11 @@ if __name__=="__main__":
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
             40,1.45,0.5,0.5,0.98,30,0.9,1)
-    frame_count = 0
     #if os.path.isfile("./tracking.json"):
     #    mface.ids_manager.preload_ids("./tracking.json")
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("./test_tracked.mp4")
+    #cap = cv2.VideoCapture(0)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -196,19 +212,29 @@ if __name__=="__main__":
     writer = cv2.VideoWriter("tracked.mp4", fourcc, fps,(width,height),True)
     while cap.isOpened():
         ret, img = cap.read()
-        frame_count +=1
         if img is None or img.shape[0] == 0:
             break
-        writer.write(img)
-        for face in mface.track_image(img):
+        #writer.write(img)
+
+        
+        try:
+            faces = mface.track_image(img) 
+        except:
+            pass
+            #writer.release()
+            #exit()
+
+        for face in faces:
             name = mface.ids_manager.check_match(face.id)
             if name is None:
                 name = "Undecided"
             PCN.DrawFace(face,img,name)
+            PCN.DrawPoints(face,img)
 
-        cv2.putText(img,str(frame_count),(10,80), cv2.FONT_HERSHEY_SIMPLEX, 3,(0,255,0),3,cv2.LINE_AA)
+        cv2.putText(img,str(mface.ids_manager.cycle_counter),(10,80), cv2.FONT_HERSHEY_SIMPLEX, 3,(0,255,0),3,cv2.LINE_AA)
         cv2.imshow('window', img)
         mface.pcn_detector.CheckTrackingPeriod()
+        writer.write(img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     mface.ids_manager.save_ids("tracking.json")
