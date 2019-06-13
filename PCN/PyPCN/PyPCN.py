@@ -210,7 +210,7 @@ if __name__=="__main__":
         for win in windows:
             PCN.DrawFace(win,frame)
             PCN.DrawPoints(win,frame)
-            print(PCN.CalculateFaceYaw(win))
+
         cv2.imshow('window', frame)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
