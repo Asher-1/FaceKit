@@ -34,7 +34,7 @@ class NameGenerator():
         return current_name
 
 class IDMatchingManager():
-    def __init__(self,classifier_path,th_similar,th_symmetry,max_desc_len,yaw_th):
+    def __init__(self,classifier_path,th_similar,th_symmetry,yaw_th,merge_th,max_desc_len):
         self.history_ids = {}
         self.first_appearance = {}
         self.revese_matches = bidict()
@@ -44,11 +44,27 @@ class IDMatchingManager():
         self.cycle_counter = 0
         self.name_gen = NameGenerator("./dist.male.first")
         self.yaw_th = yaw_th
+        self.merge_th = merge_th
 
         with open(classifier_path, 'rb') as fd:
             self.classifier_MLP = pickle.load(fd)
    
-    def append_id(self,new_id,desc):
+    def append_id_desc(self,append_id,desc):
+        key_merges = {}
+        for h_key in self.history_ids.keys():
+            if h_key == append_id:
+                continue
+            match_prob = np.max(self.compare_descriptors(self.history_ids[h_key],[desc],self.th_symmetry))
+            if match_prob > self.th_similar:
+                key_merges[h_key] = match_prob
+
+        if len(key_merges) == 0: ## Append freely
+            if append_id not in self.history_ids:
+                self.history_ids[append_id] = deque([],self.max_desc_len)
+            self.history_ids[append_id].append(desc)
+            return True
+        else:
+            debug_msg("{0}: Not appending: {1} similar to {2}",self.cycle_counter, append_id,key_merges)
         pass
 
     def compare_descriptors(self,desc1,desc2,th_sym):
@@ -94,39 +110,46 @@ class IDMatchingManager():
         #if self.cycle_counter == 99:
         #    dbg()
 
-        corr_dict = {} 
-        for ih1 in range(len(hist_keys)):
-            for ih2 in range(ih1,len(hist_keys)):
-                h1 = hist_keys[ih1]
-                h2 = hist_keys[ih2]
-                if h1 == h2:
-                    continue
-                match_prob = self.compare_descriptors(self.history_ids[h1],self.history_ids[h2],self.th_symmetry)
-                corr_dict[(h1,h2)] = np.max(match_prob)
-        debug_msg("{0}: corr_dict = {1}".format(self.cycle_counter,corr_dict))
-        #debug_msg("{0}: JOHN * JAMES = {1}".format(self.cycle_counter,match_prob))
+        #corr_dict = {} 
+        #for ih1 in range(len(hist_keys)):
+        #    for ih2 in range(ih1,len(hist_keys)):
+        #        h1 = hist_keys[ih1]
+        #        h2 = hist_keys[ih2]
+        #        if h1 == h2:
+        #            continue
+        #        match_prob = self.compare_descriptors(self.history_ids[h1],self.history_ids[h2],self.th_symmetry)
+        #        corr_dict[(h1,h2)] = np.max(match_prob)
+        #debug_msg("{0}: corr_dict = {1}".format(self.cycle_counter,corr_dict))
 
 
         # Generate tracked faces
         revese_matches = bidict()
         undecided = []
-        key_pairs_for_merge = []
+        key_groups_for_merge = []
         for r,c in zip(row_ind,col_ind):
             if corr_mtx[r,c] > self.th_similar and \
                     tracked_yaw[tracked_keys[c]] < self.yaw_th: 
-                ## In case of duplication we want to merge history
-                #if tracked_keys[c] in self.revese_matches and \
-                #        hist_keys[r] != self.revese_matches[tracked_keys[c]]: 
-                #    key_pairs_for_merge.append((hist_keys[r],self.revese_matches[tracked_keys[c]]))
+
+                # Prepare merges
+                ## Check if it matches other hist_keys and \
+                ## check if tracked_id matched one of these other faces
+                column_matches = corr_mtx[:,c] > self.merge_th
+                column_matches[r] = False # exclude the result of linear assignment
+                potential_hist_keys = np.array(hist_keys)[column_matches].tolist() 
+
+                if tracked_keys[c] in self.revese_matches and \
+                    self.revese_matches[tracked_keys[c]] in potential_hist_keys:
+                        key_groups_for_merge.append(([hist_keys[r]]+potential_hist_keys))
                 revese_matches[tracked_keys[c]] = hist_keys[r]
             else:
-                debug_msg("{0}: Undecided {1:.2f}".format(self.cycle_counter,corr_mtx[r,c]))
+                debug_msg("{0}: Undecided id {1} [corr={2:.2f}, yaw = {3:.2f}]"\
+                        .format(self.cycle_counter,tracked_keys[c],
+                            corr_mtx[r,c],tracked_yaw[tracked_keys[c]]))
                 undecided.append((r,c))
 
         ## Assign tracked faces since there are mote face than db
         unassigned = np.delete(np.arange(0,len(tracked_keys),1),col_ind).tolist()
         undecided_c = [u[1] for u in undecided]
-
         for c in unassigned + undecided_c:
             if tracked_keys[c] in self.revese_matches: 
 
@@ -138,35 +161,37 @@ class IDMatchingManager():
 
                 #if good yaw then we might have a new descriptor for existing face
                 if tracked_yaw[tracked_keys[c]] < self.yaw_th:
-                    debug_msg("{0}: New descriptor added to {1} from id {2}".format(self.cycle_counter,self.revese_matches[tracked_keys[c]],tracked_keys[c]))
-                    self.history_ids[self.revese_matches[tracked_keys[c]]].append(tracked_desc[c]) #found a tracked desc of the face
+                    #self.history_ids[self.revese_matches[tracked_keys[c]]].append(tracked_desc[c]) #found a tracked desc of the face
+                    if self.append_id_desc(tracked_keys[c],tracked_desc[c]):
+                        debug_msg("{0}: New descriptor added to {1} from id {2}".format(self.cycle_counter,self.revese_matches[tracked_keys[c]],tracked_keys[c]))
 
             else: ## A totally new face
                 ## Assign new key only if low enough yaw
                 if tracked_yaw[tracked_keys[c]] < self.yaw_th:
                     assigned_key = self.name_gen.get_full_name()
-                    self.history_ids[assigned_key] = deque([tracked_desc[c]],self.max_desc_len)
-                    revese_matches[tracked_keys[c]] = assigned_key
+                    #self.history_ids[assigned_key] = deque([tracked_desc[c]],self.max_desc_len)
+                    if self.append_id_desc(assigned_key,tracked_desc[c]):
+                        debug_msg("{0}: New key added {1} from id {2}".format(self.cycle_counter,assigned_key,tracked_keys[c]))
+                        revese_matches[tracked_keys[c]] = assigned_key
 
-        ## Perform merges 
-        for a_key,b_key in key_pairs_for_merge:
-            if self._get_first_appearance(a_key) < self._get_first_appearance(b_key):
-               base_key,other_key = a_key, b_key
-            else:
-               base_key,other_key = b_key, a_key
-            debug_msg("{0}: Merging {1} -> {2}".format(self.cycle_counter,other_key,base_key))
 
-            if other_key in revese_matches.inverse:
-                if base_key in revese_matches.inverse:
-                    debug_msg("{0}: Bad merge:Two images matched to same merge!!!".format(self.cycle_counter))
-                    continue ## Can't do merge in this situation
+        ## Perform merges
+        for group in key_groups_for_merge:
+            base_key = min(group, key= lambda x: self._get_first_appearance(x))
+            for other_key in group:
+                if other_key == base_key:
+                    continue
+                if other_key in revese_matches.inverse and base_key in revese_matches.inverse:
+                        debug_msg("{0}: Can't merge: Both hist keys are separatly tracked".format(self.cycle_counter))
+                        continue ## Can't do merge in this situation
                 else:
                     tracked_key = revese_matches.inverse[other_key]
                     revese_matches[tracked_key] = base_key
+                    debug_msg("{0}: Merging {1} -> {2}".format(self.cycle_counter,other_key,base_key))
 
-            ## Remove key from history
-            other_desc = self.history_ids.pop(other_key)
-            self.history_ids[base_key].extend(other_desc)
+                    ## Remove key from history
+                    other_desc = self.history_ids.pop(other_key)
+                    self.history_ids[base_key].extend(other_desc)
 
         self.revese_matches = revese_matches
         self._update_history_counter()
@@ -189,8 +214,33 @@ class IDMatchingManager():
 
 
 class MultifaceTracker():
-    def __init__(self,classifier_path,th_similar,th_symmetry,max_desc_len,yaw_th, *args):
-        self.ids_manager = IDMatchingManager(classifier_path,th_similar,th_symmetry,max_desc_len,yaw_th)
+    '''
+    Multiple face tracker
+
+    Parameters
+    ----------
+    classifier_path : str
+        MLPClassifer path. Used as metric for distances between faces
+    th_similar : float
+        Threshold below which faces are considered non similar
+    th_symmetry : float
+        Threshold for symmetry for the MLPClassifier. This metric might by assymetric i.e. |a-b| != |b-a|
+    yaw_th : float
+        Threshold on the face "yaw" angle below which the face is considered as "Undecided" unless was 
+        tracked in previous frames
+    merge_th : float
+        Threshold above which history faces become condidates for merging
+    max_desc_len: int
+        Max number of history descriptors saved per one face
+
+    *args
+        Arguments passed directly to PCN
+    **kwargs
+        Arguments passed directly to PCN
+    '''
+
+    def __init__(self,classifier_path,th_similar,th_symmetry,yaw_th,merge_th,max_desc_len ,*args):
+        self.ids_manager = IDMatchingManager(classifier_path,th_similar,th_symmetry,yaw_th,merge_th,max_desc_len)
         self.pcn_detector = PCN(*args)
 
 
@@ -217,11 +267,10 @@ if __name__=="__main__":
     embed_model_path = "./model/resnetInception-128.caffemodel"
     embed_proto = "./model/resnetInception-128.prototxt"
     classifier_path = "./model/trained_MLPClassifier_model.clf"
-    #classifier_path = "./model/trained_QuadraticDiscriminantAnalysis_model.clf"
 
     mface = MultifaceTracker(
             classifier_path,
-            0.7,0.02,50,0.5,
+            0.7,0.02,0.5,0.99,20,
             detection_model_path,pcn1_proto,pcn2_proto,pcn3_proto,
             tracking_model_path,tracking_proto, 
             embed_model_path, embed_proto,
@@ -230,6 +279,7 @@ if __name__=="__main__":
     #    mface.ids_manager.preload_ids("./tracking.json")
 
     cap = cv2.VideoCapture("./test_tracked2.mp4")
+    #cap = cv2.VideoCapture("./test_tracked.mp4")
     #cap = cv2.VideoCapture(0)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -241,14 +291,13 @@ if __name__=="__main__":
         ret, img = cap.read()
         if img is None or img.shape[0] == 0:
             break
-        writer.write(img)
+        #writer.write(img)
         
         try:
             faces = mface.track_image(img) 
-        except:
+        finally:
             writer.release()
-            exit()
-        #faces = mface.track_image(img) 
+            #exit()
 
         for face in faces:
             name = mface.ids_manager.check_match(face.id)
@@ -260,7 +309,7 @@ if __name__=="__main__":
         cv2.putText(img,str(mface.ids_manager.cycle_counter),(10,80), cv2.FONT_HERSHEY_SIMPLEX, 3,(0,255,0),3,cv2.LINE_AA)
         cv2.imshow('window', img)
         mface.pcn_detector.CheckTrackingPeriod()
-        #writer.write(img)
+        writer.write(img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     mface.ids_manager.save_ids("tracking.json")
