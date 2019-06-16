@@ -10,6 +10,25 @@ from bidict import bidict
 import sys
 from ipdb import set_trace as dbg
 
+
+def DrawLines(win,img):
+    #f = FeatEnam.NOSE
+    #cv2.circle(img,(win.points[f].x,win.points[f].y),2,(255, 153, 255))
+    cv2.line(img,
+            (win.points[FeatEnam.EYE_RIGHT].x,win.points[FeatEnam.EYE_RIGHT].y),
+            (win.points[FeatEnam.MOUTH_LEFT].x,win.points[FeatEnam.MOUTH_LEFT].y),
+            (0,255,255),1)
+    cv2.line(img,
+            (win.points[FeatEnam.EYE_LEFT].x,win.points[FeatEnam.EYE_LEFT].y),
+            (win.points[FeatEnam.MOUTH_RIGHT].x,win.points[FeatEnam.MOUTH_RIGHT].y),
+            (0,255,255),1)
+    #f = FeatEnam.EYE_RIGHT
+    #cv2.circle(img,(win.points[f].x,win.points[f].y),2,(0,255,255))
+    #f = FeatEnam.MOUTH_LEFT
+    #cv2.circle(img,(win.points[f].x,win.points[f].y),2,(0,255,0))
+    #f = FeatEnam.MOUTH_RIGHT
+    #cv2.circle(img,(win.points[f].x,win.points[f].y),2,(0,255,0))
+
 def debug_msg(string):
     print(string)
 
@@ -137,6 +156,7 @@ class IDMatchingManager():
                 column_matches[r] = False # exclude the result of linear assignment
                 potential_hist_keys = np.array(hist_keys)[column_matches].tolist() 
 
+                ## TODO: if 3 or more matches you should take only the tracked one for merge
                 if tracked_keys[c] in self.revese_matches and \
                     self.revese_matches[tracked_keys[c]] in potential_hist_keys:
                         key_groups_for_merge.append(([hist_keys[r]]+potential_hist_keys))
@@ -278,9 +298,9 @@ if __name__=="__main__":
     #if os.path.isfile("./tracking.json"):
     #    mface.ids_manager.preload_ids("./tracking.json")
 
-    cap = cv2.VideoCapture("./test_tracked2.mp4")
+    #cap = cv2.VideoCapture("./test_tracked2.mp4")
     #cap = cv2.VideoCapture("./test_tracked.mp4")
-    #cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -305,6 +325,7 @@ if __name__=="__main__":
                 name = "Undecided"
             PCN.DrawFace(face,img,name)
             PCN.DrawPoints(face,img)
+            DrawLines(face,img)
 
         cv2.putText(img,str(mface.ids_manager.cycle_counter),(10,80), cv2.FONT_HERSHEY_SIMPLEX, 3,(0,255,0),3,cv2.LINE_AA)
         cv2.imshow('window', img)
