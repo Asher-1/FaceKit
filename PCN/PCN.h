@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include "caffe/util/db.hpp"
+
+namespace db = caffe::db;
 
 #include "opencv2/opencv.hpp"
 #include "caffe/caffe.hpp"
@@ -116,6 +119,7 @@ public:
     void SetTrackingPeriod(int period);
     int GetTrackingPeriod();
     void SetTrackingThresh(float thresh);
+    std::vector<Window> GenerateThirdLayerInput(cv::Mat img, db::DB *db, int image_label);
     /// detection
     std::vector<Window> Detect(cv::Mat img);
     /// tracking
@@ -156,6 +160,8 @@ private:
     std::vector<Window> Detect_(cv::Mat img, cv::Mat imgPad);
     std::vector<Window> Track_(cv::Mat img, caffe::shared_ptr<caffe::Net<float> > &net,
                                float thres, int dim, std::vector<Window> &winList);
+    void DumpImage_(std::vector<cv::Mat> &input, db::DB *db, int image_label);
+    void PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, int image_label);
 
     //private data
     caffe::shared_ptr<caffe::Net<float> > net_[5];

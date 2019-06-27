@@ -50,6 +50,18 @@ extern "C"
 		return  api_pcn->detector->GetTrackingPeriod();
 	}
 
+	void generate_third_detect_layer_input(void* pcn, unsigned char* raw_img, size_t rows, size_t cols, int *lwin, db::DB *db, int label)
+	{
+		API_PCN* api_pcn = (API_PCN*) pcn;
+		cv::Mat img(rows, cols, CV_8UC3, (void *)raw_img);
+		std::vector<Window> faces = api_pcn->detector->GenerateThirdLayerInput(img, db, label);
+
+		*lwin = faces.size();
+		if (*lwin > kMaxFaces)
+			*lwin = kMaxFaces;
+		memcpy(api_pcn->wins,&faces[0],*lwin * sizeof(Window));
+	}
+
 	Window* detect_faces(void* pcn, unsigned char* raw_img,size_t rows, size_t cols, int *lwin)
 	{
 		API_PCN* api_pcn = (API_PCN*) pcn;

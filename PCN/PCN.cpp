@@ -1,5 +1,6 @@
 #include "PCN.h"
 #include "PCN_API.h"
+#include "lmdb.h"
 
 PCN::PCN(std::string modelDetect, std::string net1, std::string net2, std::string net3,
          std::string modelTrack, std::string netTrack,
@@ -256,6 +257,35 @@ void PCN::SetInput_(cv::Mat input, caffe::shared_ptr<caffe::Net<float> > &net)
     }
 }
 
+void PCN::DumpImage_(std::vector<cv::Mat> &input, db::DB *db, int image_label)
+{
+    std::vector<cv::Mat> tmp;
+    int rows = input[0].rows; 
+    int cols = input[0].cols;
+    int length = rows * cols;
+    float * p = NULL;
+    float * copy_pointer = NULL;
+    int number_of_channels = 3;
+    int total_input_size = length * number_of_channels * input.size() * sizeof(*p);
+
+    p = (float *)malloc(total_input_size);
+    copy_pointer = p;
+
+    for (int i = 0; i < input.size(); i++)
+    {
+        cv::split(input[i], tmp);
+        for (int j = 0; j < tmp.size(); j++)
+        {
+            memcpy(copy_pointer, tmp[j].data, sizeof(*p) * length);
+            copy_pointer += length;
+        }
+		/* dump to lmdb */
+        LMDB__add_to_database(db, total_input_size, (char *)(p), image_label);
+    }
+
+    free(p);
+}
+
 void PCN::SetInput_(std::vector<cv::Mat> &input, caffe::shared_ptr<caffe::Net<float> > &net)
 {
     int rows = input[0].rows, cols = input[0].cols;
@@ -508,6 +538,38 @@ std::vector<Window> PCN::Stage2_(cv::Mat img, cv::Mat img180, caffe::shared_ptr<
     return ret;
 }
 
+void PCN::PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, int image_label)
+{
+    if (winList.size() == 0)
+        return;
+    std::vector<cv::Mat> dataList;
+    int height = img.rows;
+    int width = img.cols;
+
+    for (int i = 0; i < winList.size(); i++)
+    {
+        if (abs(winList[i].angle) < EPS)
+            dataList.push_back(PreProcessImg_(img(cv::Rect(winList[i].x, winList[i].y, winList[i].width, winList[i].height)), dim));
+        else if (abs(winList[i].angle - 90) < EPS)
+        {
+            dataList.push_back(PreProcessImg_(img90(cv::Rect(winList[i].y, winList[i].x, winList[i].height, winList[i].width)), dim));
+        }
+        else if (abs(winList[i].angle + 90) < EPS)
+        {
+            int x = winList[i].y;
+            int y = width - 1 - (winList[i].x + winList[i].width - 1);
+            dataList.push_back(PreProcessImg_(imgNeg90(cv::Rect(x, y, winList[i].width, winList[i].height)), dim));
+        }
+        else
+        {
+            int y2 = winList[i].y + winList[i].height - 1;
+            dataList.push_back(PreProcessImg_(img180(cv::Rect(winList[i].x, height - 1 - y2, winList[i].width, winList[i].height)), dim));
+        }
+    }
+
+    DumpImage_(dataList, db, image_label);
+}
+
 std::vector<Window> PCN::Stage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList)
 {
     if (winList.size() == 0)
@@ -718,6 +780,30 @@ std::vector<Window> PCN::Detect_(cv::Mat img, cv::Mat imgPad)
     winList = DeleteFP_(winList);
     if (doEmbed_)
 	    winList = Embed_(imgPad,net_[NET_EMBED],winList,NET_EMBED_WIN_SIZE);
+    return winList;
+}
+
+std::vector<Window> PCN::GenerateThirdLayerInput(cv::Mat img, db::DB *db, int image_label)
+{
+    cv::Mat img180, img90, imgNeg90;
+    cv::Mat imgPad = PadImg_(img);
+
+    cv::flip(imgPad, img180, 0);
+    cv::transpose(imgPad, img90);
+    cv::flip(img90, imgNeg90, 0);
+
+    std::vector<Window> winList = Stage1_(img, imgPad, net_[NET_STAGE1], 
+		    classThreshold_[NET_STAGE1]);
+    winList = NMS_(winList, true, nmsThreshold_[NET_STAGE1]);
+
+    winList = Stage2_(imgPad, img180, net_[NET_STAGE2], 
+		    classThreshold_[NET_STAGE2], NET_STAGE2_WIN_SIZE, winList);
+    winList = NMS_(winList, true, nmsThreshold_[NET_STAGE2]);
+
+    PartialStage3_(imgPad, img180, img90, imgNeg90, net_[NET_STAGE3], 
+		    classThreshold_[NET_STAGE3], NET_STAGE3_WIN_SIZE, winList, db, image_label);
+
+
     return winList;
 }
 
