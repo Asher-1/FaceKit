@@ -268,22 +268,7 @@ void PCN::DumpImage_(std::vector<cv::Mat> &input, db::DB *db, int image_label)
     int number_of_channels = 3;
     int total_input_size = length * number_of_channels * input.size() * sizeof(*p);
 
-    p = (float *)malloc(total_input_size);
-    copy_pointer = p;
-
-    for (int i = 0; i < input.size(); i++)
-    {
-        cv::split(input[i], tmp);
-        for (int j = 0; j < tmp.size(); j++)
-        {
-            memcpy(copy_pointer, tmp[j].data, sizeof(*p) * length);
-            copy_pointer += length;
-        }
-		/* dump to lmdb */
-        LMDB__add_to_database(db, total_input_size, (char *)(p), image_label);
-    }
-
-    free(p);
+    LMDB__add_to_database(db, input[0], image_label);
 }
 
 void PCN::SetInput_(std::vector<cv::Mat> &input, caffe::shared_ptr<caffe::Net<float> > &net)
@@ -538,6 +523,15 @@ std::vector<Window> PCN::Stage2_(cv::Mat img, cv::Mat img180, caffe::shared_ptr<
     return ret;
 }
 
+float PCN::OnlyStage3_(std::vector<cv::Mat> dataList, caffe::shared_ptr<caffe::Net<float> > &net)
+{
+    SetInput_(dataList, net);
+    net->Forward();
+    caffe::Blob<float>* prob = net->output_blobs()[1];
+
+    return prob->data_at(0, 1, 0, 0);
+}
+
 void PCN::PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, int image_label)
 {
     if (winList.size() == 0)
@@ -545,6 +539,9 @@ void PCN::PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat img
     std::vector<cv::Mat> dataList;
     int height = img.rows;
     int width = img.cols;
+
+    winList = NMS_(winList, false, nmsThreshold_[NET_STAGE3]);
+    winList = DeleteFP_(winList);
 
     for (int i = 0; i < winList.size(); i++)
     {
@@ -685,40 +682,45 @@ std::vector<Window> PCN::SmoothWindowWithId_(std::vector<Window> winList)
     //static std::vector<Window> preList_;
     for (int i = 0; i < winList.size(); i++)
     {
-	int jmax = -1;//Hold max IOU index window
-	float max_iou = 0;
+        int jmax = -1;//Hold max IOU index window
+        float max_iou = 0;
 	
-	//Find max IOU	
+        //Find max IOU	
         for (int j = 0; j < preList_.size(); j++)
-	{
-	    float iou = IoU_(winList[i], preList_[j]);
-	    if (iou > max_iou){
-		    jmax = j;
-	    	    max_iou = iou;
-	    }
-	}
+        {
+            float iou = IoU_(winList[i], preList_[j]);
+            if (iou > max_iou){
+                jmax = j;
+                max_iou = iou;
+            }
+        }
 
-	if (max_iou > kMinIoU_Tracking) {
-	    winList[i].conf = (winList[i].conf + preList_[jmax].conf) / 2;
-	    winList[i].x = (max_iou*winList[i].x + (1-max_iou)*preList_[jmax].x);
-	    winList[i].y = (max_iou*winList[i].y + (1-max_iou)*preList_[jmax].y);
-	    winList[i].width = (max_iou*winList[i].width + (1-max_iou)*preList_[jmax].width);
-	    winList[i].height = (max_iou*winList[i].height + (1-max_iou)*preList_[jmax].height);
-	    winList[i].angle = SmoothAngle_(winList[i].angle, preList_[jmax].angle);
+        if (max_iou > kMinIoU_Tracking) 
+        {
+            winList[i].conf = (winList[i].conf + preList_[jmax].conf) / 2;
+            winList[i].x = (max_iou*winList[i].x + (1-max_iou)*preList_[jmax].x);
+            winList[i].y = (max_iou*winList[i].y + (1-max_iou)*preList_[jmax].y);
+            winList[i].width = (max_iou*winList[i].width + (1-max_iou)*preList_[jmax].width);
+            winList[i].height = (max_iou*winList[i].height + (1-max_iou)*preList_[jmax].height);
+            winList[i].angle = SmoothAngle_(winList[i].angle, preList_[jmax].angle);
 
-	    if (winList[i].id < 0) // in case this window just detected
-		winList[i].set_points(preList_[jmax].points14);
-	    else
-	    	for (int k = 0; k < kFeaturePoints; k++) {
-	    	    winList[i].points14[k].x = (max_iou * winList[i].points14[k].x + (1-max_iou) * preList_[jmax].points14[k].x);
-	    	    winList[i].points14[k].y = (max_iou * winList[i].points14[k].y + (1-max_iou) * preList_[jmax].points14[k].y);
-	    	}
-	    winList[i].id = preList_[jmax].id; 
-	   
-	}else{
-	    //trackPeriod_ = 0;
-	    winList[i].id = global_id_++; 
-	}
+            if (winList[i].id < 0) // in case this window just detected
+                winList[i].set_points(preList_[jmax].points14);
+            else
+                for (int k = 0; k < kFeaturePoints; k++) 
+                {
+                    winList[i].points14[k].x = (max_iou * winList[i].points14[k].x + (1-max_iou) * preList_[jmax].points14[k].x);
+                    winList[i].points14[k].y = (max_iou * winList[i].points14[k].y + (1-max_iou) * preList_[jmax].points14[k].y);
+                }
+
+            winList[i].id = preList_[jmax].id; 
+
+        }
+        else
+        {
+            //trackPeriod_ = 0;
+            winList[i].id = global_id_++; 
+        }
     }
 
     //if ((preList_.size() > winList.size()) | 
@@ -781,6 +783,11 @@ std::vector<Window> PCN::Detect_(cv::Mat img, cv::Mat imgPad)
     if (doEmbed_)
 	    winList = Embed_(imgPad,net_[NET_EMBED],winList,NET_EMBED_WIN_SIZE);
     return winList;
+}
+
+float PCN::ProcessSingleImageStage3(std::vector<cv::Mat> image)
+{
+    return OnlyStage3_(image, net_[NET_STAGE3]);
 }
 
 std::vector<Window> PCN::GenerateThirdLayerInput(cv::Mat img, db::DB *db, int image_label)

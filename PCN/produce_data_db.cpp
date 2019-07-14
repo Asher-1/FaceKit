@@ -1,3 +1,4 @@
+#include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 #include "PCN_API.h"
 #include "lmdb.h"
@@ -144,6 +145,93 @@ void GetFilesInDirectory(std::vector<std::string> &out, const std::string &direc
     closedir(dir);
 }
 
+cv::Mat DatumToCVMat(Datum *datum)
+{
+    int datum_channels = datum->channels();
+    int datum_height = datum->height();
+    int datum_width = datum->width();
+
+    string strData = datum->data();
+    cv::Mat cv_img;
+
+    if (strData.size() != 0)
+    {
+        cv_img.create(datum_height, datum_width, CV_8UC(datum_channels));
+        const string& data = datum->data();
+        std::vector<char> vec_data(data.c_str(), data.c_str() + data.size());
+
+        for (int h = 0; h < datum_height; ++h) {
+            uchar* ptr = cv_img.ptr<uchar>(h);
+            int img_index = 0;
+            for (int w = 0; w < datum_width; ++w) {
+                for (int c = 0; c < datum_channels; ++c) {
+                    int datum_index = (c * datum_height + h) * datum_width + w;
+                    ptr[img_index++] = static_cast<uchar>(vec_data[datum_index]);
+                }
+            }
+        }
+    }
+
+    else
+    {
+        cv_img.create(datum_height, datum_width, CV_32FC(datum_channels));
+        for (int h = 0; h < datum_height; ++h) {
+            float* ptr = cv_img.ptr<float>(h);
+            int img_index = 0;
+            for (int w = 0; w < datum_width; ++w) {
+                for (int c = 0; c < datum_channels; ++c) {
+                    int datum_index = (c * datum_height + h) * datum_width + w;
+                    ptr[img_index++] = static_cast<float>(datum->float_data(datum_index));
+                }
+            }
+        }
+    }
+
+    return cv_img;
+}
+
+void test_images(PCN *detector, std::string train_db_directory)
+{
+    db::DB *db(db::GetDB("lmdb"));
+    db->Open(train_db_directory + "lmdb", db::READ);
+    db::Cursor *cursor(db->NewCursor());
+    int train_index = 0;
+    caffe::Datum datum;
+    cv::Mat image;
+    std::vector<cv::Mat> dataList(1);
+    float result = -1;
+
+    dataList.clear();
+
+    while(cursor->valid())
+    {
+		Window* wins = NULL;
+        cv::Mat image;
+		int lwin = -1;
+
+        datum.ParseFromString(cursor->value());
+        image = DatumToCVMat(&datum);
+        /*
+        cv::imshow("", image);
+        cv::waitKey(0);
+        */
+        dataList.push_back(image);
+
+        /* Call Stage3 */
+        result = process_single_image(detector, dataList);
+        if (result < 0.8)
+            printf("%d: %f\n", train_index, result);
+
+        dataList.clear();
+
+        train_index++;
+        cursor->Next();
+    }
+
+l_Cleanup:
+    db->Close();
+}
+
 int main(int argc, char **argv)
 {
     char * images_directory = NULL;
@@ -173,9 +261,13 @@ int main(int argc, char **argv)
 	PCN* detector = (PCN*) init_detector(detection_model_path, pcn1_proto, pcn2_proto, pcn3_proto,
 			tracking_model_path, tracking_proto, embed_model, embed_proto,
 			40, 1.45, 0.5, 0.5, 0.98, 30, 0.9, 1);
-	
-    // cv::Mat crpImg(CROPPED_FACE, CROPPED_FACE, CV_8UC3, cv::Scalar(0,0, 0));
 
+    if (0 == test_train_ratio)
+    {
+        test_images(detector, train_directory);
+        goto l_Exit;
+    }
+	
 	GetFilesInDirectory(directories, images_directory, FILE_TYPE__DIRECTORY);
     for (std::vector<std::string>::iterator i = directories.begin();
             i != directories.end(); i++) {
@@ -188,6 +280,7 @@ int main(int argc, char **argv)
 
     train_db = LMDB__init_db(train_directory, "lmdb");
     test_db = LMDB__init_db(test_directory, "lmdb");
+
     db = train_db;
     for (std::vector<std::string>::iterator i = out.begin(); i != out.end(); i++)
 	{
@@ -221,6 +314,9 @@ int main(int argc, char **argv)
 l_Cleanup:
     LMDB__fini_db(test_db);
     LMDB__fini_db(train_db);
+    /*
+    */
+l_Exit:
 	cv::destroyAllWindows();
 	free_detector(detector);
 	return 0;

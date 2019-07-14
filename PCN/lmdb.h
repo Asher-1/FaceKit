@@ -14,6 +14,6 @@ db::DB *LMDB__init_db(string path, string db_type);
 
 void LMDB__fini_db(db::DB *db);
 
-void LMDB__add_to_database(db::DB *db, int datum_size, char *buffer, int label);
+void LMDB__add_to_database(db::DB *db, cv::Mat cv_img, int label);
 
 #endif /* __LMDB_H__*/

@@ -50,6 +50,12 @@ extern "C"
 		return  api_pcn->detector->GetTrackingPeriod();
 	}
 
+	float process_single_image(void *pcn, std::vector<cv::Mat> dataList)
+	{
+		API_PCN *api_pcn = (API_PCN *) pcn;
+		return api_pcn->detector->ProcessSingleImageStage3(dataList);
+	}
+
 	void generate_third_detect_layer_input(void* pcn, unsigned char* raw_img, size_t rows, size_t cols, int *lwin, db::DB *db, int label)
 	{
 		API_PCN* api_pcn = (API_PCN*) pcn;

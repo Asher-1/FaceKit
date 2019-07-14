@@ -40,6 +40,7 @@ layer {
   type: "Convolution"
   bottom: "data"
   top: "conv1_3"
+  input_param { shape: { dim: 1 dim: 3 dim: 48 dim: 48 } }
   param {
 	lr_mult: 0
 	decay_mult: 0
@@ -58,14 +59,6 @@ layer {
   type: "Pooling"
   bottom: "conv1_3"
   top: "pool1_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
   pooling_param {
     pool: MAX
     kernel_size: 3
@@ -77,14 +70,6 @@ layer {
   type: "ReLU"
   bottom: "pool1_3"
   top: "pool1_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "conv2_3"
@@ -109,14 +94,6 @@ layer {
   type: "Pooling"
   bottom: "conv2_3"
   top: "pool2_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
   pooling_param {
     pool: MAX
     kernel_size: 3
@@ -128,14 +105,6 @@ layer {
   type: "ReLU"
   bottom: "pool2_3"
   top: "pool2_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "conv3_3"
@@ -160,14 +129,6 @@ layer {
   type: "Pooling"
   bottom: "conv3_3"
   top: "pool3_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
   pooling_param {
     pool: MAX
     kernel_size: 2
@@ -179,14 +140,6 @@ layer {
   type: "ReLU"
   bottom: "pool3_3"
   top: "pool3_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "conv4_3"
@@ -211,14 +164,6 @@ layer {
   type: "ReLU"
   bottom: "conv4_3"
   top: "conv4_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "fc5_3"
@@ -242,14 +187,6 @@ layer {
   type: "ReLU"
   bottom: "fc5_3"
   top: "fc5_3"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "fc6_3"
@@ -273,14 +210,6 @@ layer {
   type: "Softmax"
   bottom: "fc6_3"
   top: "cls_prob"
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
-  param {
-	lr_mult: 0
-	decay_mult: 0
-  }
 }
 layer {
   name: "bbox_reg_3"
@@ -326,19 +255,9 @@ layer {
   }
 }
 layer {
-  name: "accuracy"
-  type: "Accuracy"
-  bottom: "fc5_3"
-  bottom: "label"
-  top: "accuracy"
-  include {
-    phase: TEST
-  }
-}
-layer {
   name: "loss"
-  type: "SoftmaxWithLoss"
-  bottom: "fc5_3"
+  type: "EuclideanLoss"
+  bottom: "yaw_reg_3"
   bottom: "label"
   top: "loss"
 }

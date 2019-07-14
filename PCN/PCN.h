@@ -120,6 +120,7 @@ public:
     int GetTrackingPeriod();
     void SetTrackingThresh(float thresh);
     std::vector<Window> GenerateThirdLayerInput(cv::Mat img, db::DB *db, int image_label);
+    float ProcessSingleImageStage3(std::vector<cv::Mat> image);
     /// detection
     std::vector<Window> Detect(cv::Mat img);
     /// tracking
@@ -162,6 +163,7 @@ private:
                                float thres, int dim, std::vector<Window> &winList);
     void DumpImage_(std::vector<cv::Mat> &input, db::DB *db, int image_label);
     void PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, int image_label);
+    float OnlyStage3_(std::vector<cv::Mat> dataList, caffe::shared_ptr<caffe::Net<float> > &net);
 
     //private data
     caffe::shared_ptr<caffe::Net<float> > net_[5];
