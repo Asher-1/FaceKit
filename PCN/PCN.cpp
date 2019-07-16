@@ -257,7 +257,7 @@ void PCN::SetInput_(cv::Mat input, caffe::shared_ptr<caffe::Net<float> > &net)
     }
 }
 
-void PCN::DumpImage_(std::vector<cv::Mat> &input, db::DB *db, int image_label)
+void PCN::DumpImage_(std::vector<cv::Mat> &input, db::DB *db, float image_label)
 {
     std::vector<cv::Mat> tmp;
     int rows = input[0].rows; 
@@ -532,7 +532,7 @@ float PCN::OnlyStage3_(std::vector<cv::Mat> dataList, caffe::shared_ptr<caffe::N
     return prob->data_at(0, 1, 0, 0);
 }
 
-void PCN::PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, int image_label)
+void PCN::PartialStage3_(cv::Mat img, cv::Mat img180, cv::Mat img90, cv::Mat imgNeg90, caffe::shared_ptr<caffe::Net<float> > &net, float thres, int dim, std::vector<Window> &winList, db::DB *db, float image_label)
 {
     if (winList.size() == 0)
         return;
@@ -790,7 +790,7 @@ float PCN::ProcessSingleImageStage3(std::vector<cv::Mat> image)
     return OnlyStage3_(image, net_[NET_STAGE3]);
 }
 
-std::vector<Window> PCN::GenerateThirdLayerInput(cv::Mat img, db::DB *db, int image_label)
+std::vector<Window> PCN::GenerateThirdLayerInput(cv::Mat img, db::DB *db, float image_label)
 {
     cv::Mat img180, img90, imgNeg90;
     cv::Mat imgPad = PadImg_(img);

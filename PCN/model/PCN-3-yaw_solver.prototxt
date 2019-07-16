@@ -4,7 +4,7 @@
 # The train/test net protocol buffer definition
 net: "/home/shay/projects/FaceKit/PCN/model/PCN-3-yaw_train_test.prototxt"
 # test_iter specifies how many forward passes the test should carry out.
-test_iter: 10
+test_iter: 4
 # Carry out testing every 1000 training iterations.
 test_interval: 100
 # The base learning rate, momentum and the weight decay of the network.
@@ -16,12 +16,12 @@ lr_policy: "step"
 gamma: 1
 stepsize: 5000
 # Display every 100 iterations
-# display: 100
+display: 100
 # The maximum number of iterations
-max_iter: 60000
+max_iter: 60000000
 # snapshot intermediate results
 snapshot: 10000
 snapshot_prefix: "PCN-yaw_snapshot"
 # solver mode: CPU or GPU
 # solver_mode: GPU
-solver_mode: CPU
+solver_mode: GPU

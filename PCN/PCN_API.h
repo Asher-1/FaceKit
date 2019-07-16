@@ -56,7 +56,7 @@ extern "C"
 		return api_pcn->detector->ProcessSingleImageStage3(dataList);
 	}
 
-	void generate_third_detect_layer_input(void* pcn, unsigned char* raw_img, size_t rows, size_t cols, int *lwin, db::DB *db, int label)
+	void generate_third_detect_layer_input(void* pcn, unsigned char* raw_img, size_t rows, size_t cols, int *lwin, db::DB *db, float label)
 	{
 		API_PCN* api_pcn = (API_PCN*) pcn;
 		cv::Mat img(rows, cols, CV_8UC3, (void *)raw_img);

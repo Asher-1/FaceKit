@@ -13,7 +13,7 @@ layer {
   }
   data_param {
     source: "/home/shay/yaw_db/train/lmdb/"
-    batch_size: 256
+    batch_size: 64
     backend: LMDB
   }
 }
@@ -30,7 +30,7 @@ layer {
   }
   data_param {
     source: "/home/shay/yaw_db/test/lmdb/"
-    batch_size: 50
+    batch_size: 16
     backend: LMDB
   }
 }

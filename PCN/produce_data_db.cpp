@@ -211,16 +211,16 @@ void test_images(PCN *detector, std::string train_db_directory)
 
         datum.ParseFromString(cursor->value());
         image = DatumToCVMat(&datum);
-        /*
-        cv::imshow("", image);
-        cv::waitKey(0);
-        */
         dataList.push_back(image);
 
         /* Call Stage3 */
         result = process_single_image(detector, dataList);
         if (result < 0.8)
+        {
             printf("%d: %f\n", train_index, result);
+            cv::imshow("", image);
+            cv::waitKey(0);
+        }
 
         dataList.clear();
 
@@ -250,6 +250,7 @@ int main(int argc, char **argv)
     if (ARGUMENT__NUMBER_OF_ARGUMENTS != argc) {
         /* not enough parameters */
 		printf("not enough parameters\n");
+		printf("Usage: %s <images_db_path> <train_dir_path> <test_dir_path> <train_test_ratio>\n", argv[ARGUMENT__PROGRAM_NAME]);
         return 1;
     }
 
@@ -264,6 +265,7 @@ int main(int argc, char **argv)
 
     if (0 == test_train_ratio)
     {
+        // test_images(detector, train_directory);
         test_images(detector, train_directory);
         goto l_Exit;
     }
@@ -291,8 +293,8 @@ int main(int argc, char **argv)
         float yaw_label = YAW_LABEL_INIT;
         int yaw_label_int = YAW_LABEL_INIT;
 
-        //yaw_label = GetLabelFromImagePath(*i);
-        yaw_label_int = GetIntLabelFromImagePath(*i);
+        yaw_label = GetLabelFromImagePath(*i);
+        //yaw_label_int = GetIntLabelFromImagePath(*i);
         
         image = imread(image_path);
         if (image.empty())
@@ -306,7 +308,7 @@ int main(int argc, char **argv)
             db = test_db;
         }
         
-		generate_third_detect_layer_input(detector, image.data, image.rows, image.cols, &lwin, db, yaw_label_int);
+		generate_third_detect_layer_input(detector, image.data, image.rows, image.cols, &lwin, db, yaw_label);
 
         train_index++;
 	}
