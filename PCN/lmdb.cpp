@@ -22,7 +22,7 @@ void LMDB__fini_db(db::DB *db)
     db->Close();
 }
 
-void LMDB__add_to_database(db::DB *db, cv::Mat cv_img, int label)
+void LMDB__add_to_database(db::DB *db, cv::Mat cv_img, float label)
 {
     caffe::Datum datum;
 	db::Transaction *txn(db->NewTransaction());
