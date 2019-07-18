@@ -268,7 +268,10 @@ void PCN::DumpImage_(std::vector<cv::Mat> &input, db::DB *db, float image_label)
     int number_of_channels = 3;
     int total_input_size = length * number_of_channels * input.size() * sizeof(*p);
 
-    LMDB__add_to_database(db, input[0], image_label);
+    for (int i = 0; i < input.size(); i++)
+    {
+        LMDB__add_to_database(db, input[i], image_label);
+    }
 }
 
 void PCN::SetInput_(std::vector<cv::Mat> &input, caffe::shared_ptr<caffe::Net<float> > &net)
