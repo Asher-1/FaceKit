@@ -49,7 +49,7 @@ See [picture.cpp](picture.cpp) and [video.cpp](video.cpp) for details. If you wa
 ### Builiding PCN
 Install prerequisites On Ubuntu 18.04
 ```Shell
-sudo apt install libopencv-dev libcaffe-cpu-dev libboost-system-dev
+sudo apt install libopencv-dev libcaffe-cpu-dev libboost-system-dev libgoogle-glog-dev libgflags-dev libatlas-base-dev
 ```
 Build the library
 ```Shell
